@@ -24,6 +24,12 @@ namespace DeepLearningDraft
                 new IntFuncPair(6, ActivationFunction.ELU),
                 new IntFuncPair(10, ActivationFunction.ELU)
                 );
+            var network1 = new NN(
+                new IntFuncPair(28 * 28, ActivationFunction.ELU),
+                new IntFuncPair(6, ActivationFunction.ELU),
+                new IntFuncPair(6, ActivationFunction.ELU),
+                new IntFuncPair(10, ActivationFunction.ELU)
+                );
 
             void Test(params double[] inputs)
             {
@@ -79,6 +85,34 @@ namespace DeepLearningDraft
                 Log.Line("");
             }
 
+            void Test3(Matrix inputs, Matrix desiredOutputs)
+            {
+                Matrix result = network1.Calculate(inputs);
+                double cost = network1.CalculateCost(result, desiredOutputs);
+                string str = "";
+                for (int i = 0; i < inputs.rows; i++)
+                {
+                    str += $"{inputs[i, 0]}";
+                    if (i != inputs.rows - 1)
+                    {
+                        str += ", ";
+                    }
+                }
+                string resultStr = "  -> ";
+                for (int i = 0; i < result.rows; i++)
+                {
+                    resultStr += $"{result[i, 0]}";
+                    if (i != result.rows - 1)
+                    {
+                        resultStr += ", ";
+                    }
+                }
+                Log.Line(str);
+                Log.Line(resultStr);
+                Log.Line($" -> Cost: {cost}");
+                Log.Line("");
+            }
+
             /*
             for (int i = 0; i < 5; i++)
             {
@@ -94,7 +128,7 @@ namespace DeepLearningDraft
             for (int i = 0; i < 5; i++)
             {
                 var v = dataset.GetSample(i, false);
-                Test2(v.input, v.desiredOutput);
+                Test3(v.inputs, v.desiredOutputs);
 
             }
         }

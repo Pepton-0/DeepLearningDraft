@@ -26,6 +26,12 @@ namespace DeepLearningDraft
         [DataMember]
         public int columns { get; private set; }
 
+        public double this[int row, int column]
+        {
+            get => matrix[row, column];
+            set => matrix[row, column] = value;
+        }
+
         public Matrix(int rows, int columns)
         {
             matrix = new double[rows, columns];
@@ -56,20 +62,24 @@ namespace DeepLearningDraft
                 this.rows = vector.Length;
                 this.columns = 1;
                 this.matrix = new double[rows, columns];
+                
                 for (int i = 0; i < rows; i++)
                 {
                     this.matrix[i, 0] = vector[i];
                 }
+                //Array.Copy(vector, this.matrix, this.matrix.Length);
             }
             else
             {
                 this.columns = vector.Length;
                 this.rows = 1;
                 this.matrix = new double[rows, columns];
+                
                 for (int i = 0; i < columns; i++)
                 {
                     this.matrix[0, i] = vector[i];
                 }
+                //Array.Copy(vector, this.matrix, this.matrix.Length);
             }
         }
 

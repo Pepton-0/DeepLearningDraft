@@ -31,29 +31,35 @@ namespace DeepLearningDraft
             /// 0 to 1 pixel value.
             /// 0 means background(white), 1 means foreground(black).
             /// </summary>
-            public readonly double[] Pixel;
+            public readonly Matrix Pixel;
 
-            public double this[int i]
+            private readonly int Width;
+
+            public double this[int x, int y]
             {
-                get => Pixel[i];
-                set => Pixel[i] = value;
+                get => Pixel[Width * y + x, 0];
+                set => Pixel[Width * y + x, 0] = value;
             }
 
-            public ImageBuffer(int size)
+            public ImageBuffer(int width, int height)
             {
-                this.Pixel = new double[size];
+                this.Width = width;
+                this.Pixel = new Matrix(width * height, 1);
             }
         }
 
         public readonly struct ImageLabelPair
         {
-            public readonly double[] Label;
+            /// <summary>
+            /// Matrix(10, 1)
+            /// </summary>
+            public readonly Matrix Label;
             public readonly ImageBuffer Image;
 
             public ImageLabelPair(byte label, ImageBuffer image)
             {
-                Label = new double[labelCount];
-                Label[label] = 1.0; // One-hot encoding for label
+                Label = new Matrix(labelCount, 1);
+                Label[label, 0] = 1.0; // One-hot encoding for label
                 Image = image;
             }
         }
@@ -96,11 +102,17 @@ namespace DeepLearningDraft
             }
         }
 
-        public (double[] input, double[] desiredOutput) GetSample(int index, bool test)
+        /// <summary>
+        /// Get inputs(28 * 28, 1) and desired outputs(10, 1) of the sample
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="test"></param>
+        /// <returns></returns>
+        public (Matrix inputs, Matrix desiredOutputs) GetSample(int index, bool test)
         {
             var pair = test ? TestPair[index] : TrainingPair[index];
 
-            (double[] input, double[] desiredOutput) result =
+            (Matrix input, Matrix desiredOutput) result =
                 (pair.Image.Pixel, pair.Label);
             return result;
         }
@@ -173,13 +185,12 @@ namespace DeepLearningDraft
                 {
                     for (int i = start; i < end; i++)
                     {
-                        imgs[i] = new ImageBuffer(rows * cols);
+                        imgs[i] = new ImageBuffer(cols, rows);
                         for (int j = 0; j < rows; j++)
                         {
                             for (int k = 0; k < cols; k++)
                             {
-                                int pixelIndex = j * cols + k;
-                                imgs[i][pixelIndex] = b[i * rows * cols + pixelIndex] / 255.0d;
+                                imgs[i][k, j] = b[i * rows * cols + j * cols + k] / 255.0d;
                             }
                         }
                     }
@@ -194,8 +205,7 @@ namespace DeepLearningDraft
                 {
                     for (int j = 0; j < cols; j++)
                     {
-                        int pixelIndex = i * cols + j;
-                        double pixelValue = images[exampleIndex][pixelIndex];
+                        double pixelValue = images[exampleIndex][j, i];
                         Console.Write(pixelValue > 0.5 ? "X" : " ");
                     }
                     Console.WriteLine();
