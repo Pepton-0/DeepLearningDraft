@@ -74,6 +74,11 @@ namespace DeepLearningDraft
         }
 
         /// <summary>
+        /// Dummy array used to avoid creating new array every time Calculate is called.
+        /// </summary>
+        private readonly double[] DummyArray = new double[0];
+
+        /// <summary>
         /// Calculate output layer values from input values.
         /// </summary>
         /// <param name="inputs"></param>
@@ -93,7 +98,7 @@ namespace DeepLearningDraft
                 Layers[0][i].Bias = inputs[i]; // Set input values to input layer nodes
             }
 
-            return InternalCalculate(0, Layers[0].Select(v => v.GetActivity(new double[0])).ToArray());
+            return InternalCalculate(0, Layers[0].Select(v => v.GetActivity(DummyArray)).ToArray());
         }
 
         /// <summary>
@@ -146,6 +151,8 @@ namespace DeepLearningDraft
         {
             return Layers[Layers.Length - 1].Length;
         }
+        
+
     }
 
     public struct IntFuncPair
