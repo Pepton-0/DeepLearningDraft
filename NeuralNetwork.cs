@@ -1,158 +1,348 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace DeepLearningDraft
 {
-    /// <summary>
-    /// Deep learning neural network model
-    /// </summary>
     public class NeuralNetwork
     {
-        private readonly Node[][] Layers;
+        /// <summary>
+        /// n: numbers of nodes including input and output layers.<br/>
+        /// Index from 0 (hidden layer after input layer) to n-1(output layer). <br/>
+        /// Weight list for each layer.<br/>
+        /// Array index is layer index.<br/>
+        /// Matrix row axis is source node index.<br/>
+        /// Matrix column axis is target node index. <br/>
+        /// currentLayerOutputs : i+1 = activationFunc(layerWeights[i] * prevLayerOutputs + layerBiases[i])
+        /// </summary>
+        private readonly Matrix[] LayerWeights;
 
         /// <summary>
-        /// From arguments create nodes of input layer, hidden layers, and output layer.<br/>
-        /// Each node will be initialized with random weights, random bias and specified activation function.
+        /// Index from 0(hidden layer after input layer) to n-1(output layer).
         /// </summary>
-        /// <param name="nodes"></param>
-        public NeuralNetwork(params IntFuncPair[] pair)
+        private readonly Matrix[] LayerBiases;
+
+        /// <summary>
+        /// Index from 0(hidden layer after input layer) to n-1(output layer).
+        /// </summary>
+        private readonly ActivationFunction[] ActivationFuncs;
+
+        /// <summary>
+        /// Number of layers include input and output layer.
+        /// </summary>
+        public readonly int LayerCount;
+
+        public readonly int InputNodeCount;
+
+        public readonly int OutputNodeCount;
+
+        /// <summary>
+        /// Numbers of pairs must be at least 2 (input layer and output layer).
+        /// </summary>
+        /// <param name="pairs"></param>
+        /// <exception cref="ArgumentException"></exception>
+        public NeuralNetwork(params IntFuncPair[] pairs) : this(
+            pairs[0].Integer,
+            pairs[pairs.Length - 1].Integer,
+            new Matrix[pairs.Length - 1],
+            new Matrix[pairs.Length - 1],
+            new ActivationFunction[pairs.Length - 1])
         {
-            if(pair.Length < 2)
+            if (pairs.Any(p => p.Integer <= 0))
             {
-                throw new ArgumentException("Neural network must have at least input and output layers.");
+                throw new ArgumentException("All layers must have at least one node.");
             }
 
-            Layers = new Node[pair.Length][];
-            for (int i = 0; i < pair.Length; i++)
+            for (int i = 1; i < pairs.Length; i++)
             {
-                Layers[i] = new Node[pair[i].Integer];
-                for (int j = 0; j < pair[i].Integer; j++)
-                {
-                    int numWeights = (i == 0) ? 0 : pair[i - 1].Integer;
-                    Layers[i][j] = new Node(pair[i].Func, numWeights);
-                }
+                var prevPair = pairs[i - 1];
+                var currentPair = pairs[i];
+                var weightMatrix = new Matrix(currentPair.Integer, prevPair.Integer);
+                weightMatrix.Randomize();
+                var biasMatrix = Matrix.FromRVector(new double[currentPair.Integer]);
+                biasMatrix.Randomize();
+                LayerWeights[i - 1] = weightMatrix;
+                LayerBiases[i - 1] = biasMatrix;
+                ActivationFuncs[i - 1] = currentPair.Func;
             }
         }
 
         /// <summary>
-        /// Initialized via argument layers.<br/>
-        /// Used when loading from file or other sources.<br/>
+        /// Base constructor
         /// </summary>
-        /// <param name="layers"></param>
-        public NeuralNetwork(Node[][] layers)
+        /// <param name="layerWeights"></param>
+        /// <param name="layerBiases"></param>
+        /// <param name="activationFuncs"></param>
+        public NeuralNetwork(int inputNum, int outputNum, Matrix[] layerWeights, Matrix[] layerBiases, ActivationFunction[] activationFuncs)
         {
-            this.Layers = layers;
+            this.LayerWeights = layerWeights;
+            this.LayerBiases = layerBiases;
+            this.ActivationFuncs = activationFuncs;
 
-            if(layers.Length < 2)
-            {
-                throw new ArgumentException("Neural network must have at least input and output layers.");
-            }
+            this.LayerCount = layerWeights.GetLength(0) + 1;
+            this.InputNodeCount = inputNum;
+            this.OutputNodeCount = outputNum;
+
+            Log.Line($"{inputNum} : {outputNum}");
         }
 
         /// <summary>
-        /// Create copy of current neural network layers.
+        /// Calculate row matrix outputs from inputs
         /// </summary>
-        /// <returns></returns>
-        public Node[][] CloneNodes()
+        /// <param name="inputs">Should be (input numbers, 1)</param>
+        /// <returns>Matrix (output numbers, 1)</returns>
+        public Matrix Calculate(Matrix inputs)
         {
-            Node[][] clonedLayers = new Node[Layers.Length][];
-            for (int i = 0; i < Layers.Length; i++)
+            Matrix prevActivations = inputs;
+
+            for (int i = 0; i < LayerWeights.GetLength(0); i++)
             {
-                clonedLayers[i] = new Node[Layers[i].Length];
-                for (int j = 0; j < Layers[i].Length; j++)
-                {
-                    clonedLayers[i][j] = Layers[i][j].Clone();
-                }
+                prevActivations = InternalCalculate(i, prevActivations);
             }
 
-            return clonedLayers;
+            return prevActivations;
         }
 
         /// <summary>
-        /// Dummy array used to avoid creating new array every time Calculate is called.
-        /// </summary>
-        private readonly double[] DummyArray = new double[0];
-
-        /// <summary>
-        /// Calculate output layer values from input values.
+        /// Calculate row matrix outputs from inputs, and return all layer node activations.
         /// </summary>
         /// <param name="inputs"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        public double[] Calculate(params double[] inputs)
+        public Matrix[] CalculateAll(Matrix inputs)
         {
-            int inputLayerNum = Layers[0].Length;
+            var matrices = new Matrix[LayerCount - 1];
 
-            if (inputs.Length != inputLayerNum)
+            Matrix prevActivations = inputs;
+
+            for (int i = 0; i < LayerWeights.GetLength(0); i++)
             {
-                throw new ArgumentException("Input count must match input layer node count.");
+                prevActivations = InternalCalculate(i, prevActivations);
+                matrices[i] = prevActivations;
             }
 
-            for (int i = 0; i < inputLayerNum; i++)
-            {
-                Layers[0][i].Bias = inputs[i]; // Set input values to input layer nodes
-            }
-
-            return InternalCalculate(0, Layers[0].Select(v => v.GetActivity(DummyArray)).ToArray());
+            return matrices;
         }
 
         /// <summary>
-        /// Calculate the next layer's node array based on previous layer's node array.<br/>
-        /// This continues until the last layer is reached.
+        /// Calculate cost from outputs and actual answers
         /// </summary>
-        /// <param name="prevLayerIndex"></param>
-        /// <param name="prevNodes"></param>
-        /// <returns></returns>
-        private double[] InternalCalculate(int prevLayerIndex, double[] prevNodes)
+        /// <param name="output"></param>
+        /// <param name="answers"></param>
+        /// <returns>Cost >= 0</returns>
+        public double CalculateCostFromOutputs(Matrix outputs, Matrix answers)
         {
-            int layerIndex = prevLayerIndex + 1;
-
-            if (layerIndex >= Layers.Length)
+            var matrix = outputs - answers;
+            double sum = 0;
+            matrix.FilterFunc((from) =>
             {
-                return prevNodes; // Return the last layer's output as output layer
+                sum += from * from;
+                return from;
+            });
+
+            return sum;
+        }
+
+        public double CalculateCostFromInputs(Matrix inputs, Matrix answers)
+        {
+            return CalculateCostFromOutputs(Calculate(inputs), answers);
+        }
+
+        public double CalculateAvgCostFromInputs(Matrix[] inputs, Matrix[] answers)
+        {
+            if(inputs.Length != answers.Length)
+            {
+                throw new ArgumentException("Inputs and answers length must be same.");
             }
 
-            double[] currentLayerNodeNum = new double[Layers[layerIndex].Length];
-            for (int i = 0; i < Layers[layerIndex].Length; i++)
+            var costs = new double[inputs.Length];
+            for(int i = 0; i < inputs.Length; i++)
             {
-                currentLayerNodeNum[i] = Layers[layerIndex][i].GetActivity(prevNodes);
+                costs[i] = CalculateCostFromInputs(inputs[i], answers[i]);
             }
-
-            return InternalCalculate(layerIndex, currentLayerNodeNum);
+            Array.Sort(costs);
+            return costs[costs.Length/2];
         }
 
         /// <summary>
-        /// Calculate cost value from input values and expected output values.
+        /// Calculate the activation matrix of the index's layer from last layer's activations
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="prevActivations"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        private Matrix InternalCalculate(int index, Matrix prevActivations)
+        {
+            var func = ActivationFuncs[index];
+            // row matrix; activation list of current index layer nodes
+            var matrix = LayerWeights[index] * prevActivations + LayerBiases[index];
+            matrix.FilterFunc((from) =>
+            {
+                switch (func)
+                {
+                    case ActivationFunction.ReLu:
+                        return Math.Max(0d, from);
+                    case ActivationFunction.ELU:
+                        return from >= 0d ? from : 1d * (Math.Exp(from) - 1d);
+                    case ActivationFunction.Sigmoid:
+                        return NMath.Sigmoid(from);
+                    default:
+                        throw new NotImplementedException($"This function is not implemented: {func}");
+                }
+            });
+            return matrix;
+        }
+
+        /// <summary>
+        /// First matrices are layer weights, second matrices are layer biases.
         /// </summary>
         /// <returns></returns>
-        public double CalculateCost(double[] inputs, double[] expectedOutputs)
+        public (Matrix[], Matrix[]) CloneMatrices()
         {
-            var outputs = Calculate(inputs);
-            double sum = 0d;
-            for(int i = 0; i < outputs.Length; i++)
+            return (LayerWeights.Select(m => m.Clone()).ToArray(),
+                    LayerBiases.Select(m => m.Clone()).ToArray());
+        }
+
+        /// <summary>
+        /// Calculate gradient for the specific inputs matrix(any, 1).<br/>
+        /// </summary>
+        /// <param name="inputs"></param>
+        /// <returns>Last cost</returns>
+        public double CalculateGradient(Matrix[] inputs, Matrix[] answers)
+        {
+            double oridinalCost = CalculateAvgCostFromInputs(inputs, answers);
+
+            // List up each partial differential for each weight and bias, which is cost(inputs + delta(w)) - cost(inputs) / delta(w)
+            var allValues = new SharedRMatrix(LayerWeights.Union(LayerBiases).ToArray());
+            var diffs = new Matrix(allValues.Rows, 1); // add this to weights and biases to minimize cost
+
+            bool Approximately(double a, double b)
             {
-                sum += Math.Pow(outputs[i] - expectedOutputs[i], 2);
+                return Math.Abs(a - b) <= 0.0001;
             }
 
-            return sum / outputs.Length;
+            double CalculatePartialDifferential(int index, SharedRMatrix w)
+            {
+                var tmpValue = w[index, 0];
+                var prevDerivative = 0d;
+                var nextDerivative = double.PositiveInfinity;
+                var h = 2d;
+                int counter = 0;
+
+                do
+                {
+                    counter++;
+                    if(counter >= 500)
+                    {
+                        Log.Line("Might be infinite loop in CalculatePartialDifferential");
+                    }
+                    h /= 2d;
+                    prevDerivative = nextDerivative;
+                    w[index, 0] = tmpValue + h;
+                    nextDerivative = (CalculateAvgCostFromInputs(inputs, answers) - oridinalCost) / h;
+                    // Log.Line($"Calculated {index + 1}/{allValues.rows} partial differential: {nextDerivative}");
+                } while (!Approximately(prevDerivative, nextDerivative));
+
+                w[index, 0] = tmpValue;
+                return nextDerivative;
+            }
+
+            for (int i = 0; i < allValues.Rows; i++)
+            {
+                var diff = CalculatePartialDifferential(i, allValues);
+                diffs[i, 0] = -diff; // TODO i wanna add some noise for escaping local minimum
+                // Log.Line($"Calculated {i + 1}/{allValues.rows} partial differential: {diff}");
+            }
+
+            double lastCost = 0d;
+            double nextCost = double.PositiveInfinity;
+            double distance = 1.0d;
+
+            do
+            {
+                if (lastCost > nextCost)
+                    distance /= 2d;
+                else
+                    distance *= 1.5d; // when candidate goes too far, come back a bit
+
+                lastCost = nextCost;
+                for(int i = 0; i < diffs.Rows; i++)
+                {
+                    allValues[i, 0] = diffs[i, 0] * distance;
+                }
+                nextCost = CalculateAvgCostFromInputs(inputs, answers);
+            } while(!Approximately(lastCost, nextCost));
+
+            return nextCost;
         }
 
-        public int GetInputLayerNodeNum()
+        public double Backpropagate(Matrix[] inputs, Matrix[] answers)
         {
-            return Layers[0].Length;
-        }
+            var weightClone = new Matrix[LayerWeights.Length];
+            var weightDiffClones = new Matrix[LayerWeights.Length];
+            // var biasDiffClones = new Matrix[LayerBiases.Length];
+            var results = new Matrix[inputs.Length][];
+            for(int i = 0; i < inputs.Length; i++)
+            {
+                results[i] = CalculateAll(inputs[i]);
+            }
 
-        public int GetOutputLayerNodeNum()
-        {
-            return Layers[Layers.Length - 1].Length;
-        }
-        
+            for(int i = 0; i < LayerWeights.Length; i++)
+            {
+                weightClone[i] = LayerWeights[i].Clone();
+                weightClone[i].FilterFunc((from) => from >= 0 ? 1 : -1);
+                var biasClone = LayerBiases[i].Clone();
+                weightDiffClones[i] = new Matrix(weightClone[i].Rows, weightClone[i].Columns);
+                // biasDiffClones[i] = new Matrix(biasClone.rows, biasClone.columns);
+            }
 
+            for(int i = 0; i < results.Length; i++)
+            {
+                var result = results[i];
+                var answer = answers[i];
+                var desiredActivations = answer - result[result.Length - 1];
+
+                for (int j = LayerWeights.Length - 1; j > 0; j--)
+                {
+                    var tmp = new Matrix(desiredActivations.Rows, desiredActivations.Columns);
+                    var weights = LayerWeights[j];
+                    // var biases = LayerBiases[j]; // 1 ~ 0 - any = 
+                    // element is plus -> need to be increased
+                    // element is minus -> need to be decreased
+
+
+                    // act > 0 && weight > 0 -> increase weight
+                    // act > 0 && weight < 0 -> decrease weight
+                    // act < 0 && weight > 0 -> decrease weight
+                    // act < 0 && weight < 0 -> increase weight
+
+                    for(int row = 0; row < weights.Rows; row++)
+                    {
+                        for(int col = 0; col < weights.Columns; col++)
+                        {
+                            var d = weightClone[j][row, col] * desiredActivations[col, 0];
+                            weightDiffClones[j][row, col] += d;
+                            tmp[col, 0] += d;
+                        }
+                    }
+                    desiredActivations = tmp;
+                }
+            }
+
+            for (int i = 0; i < LayerWeights.Length; i++)
+            {
+                var w = weightDiffClones[i];
+                // var b = biasDiffClones[i];
+                w.FilterFunc((from) => from / results.Length * 0.1d);
+                LayerWeights[i] += w;
+                //b.FilterFunc((from) => from / results.Length);
+            }
+
+            return CalculateAvgCostFromInputs(inputs, answers);
+        }
     }
 
     public struct IntFuncPair
@@ -171,91 +361,6 @@ namespace DeepLearningDraft
     {
         ReLu,
         ELU,
-    }
-
-    [DataContract]
-    public class Node
-    {
-        /// <summary>
-        /// From 0 to 1.
-        /// </summary>
-        [DataMember]
-        public double[] Weights;
-
-        /// <summary>
-        /// When in input layer, this value is used as input value
-        /// </summary>
-        [DataMember]
-        public double Bias;
-
-        [DataMember]
-        public ActivationFunction ActivationFunction;
-
-        public Node(ActivationFunction func, int numWeights)
-        {
-            // TODO i wanna check if this is called with data serializer
-            Log.Line("Called initialize function");
-            SetRandomWeightsBiass(numWeights);
-            this.ActivationFunction = func;
-        }
-
-        public Node(double[] weights, double bias, ActivationFunction activationFunction)
-        {
-            this.Weights = weights;
-            this.Bias = bias;
-            this.ActivationFunction = activationFunction;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="prevLayerNodes">Can be null when the node is in input layer</param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        /// <exception cref="NotSupportedException"></exception>
-        public double GetActivity(double[] prevLayerNodes)
-        {
-            double sum = 0d;
-
-            if(prevLayerNodes.Length != Weights.Length)
-            {
-                throw new ArgumentException("Previous layer nodes count must match current node weights count.");
-            }
-
-            if (prevLayerNodes != null)
-            {
-                for (int i = 0; i < prevLayerNodes.Length; i++)
-                {
-                    sum += prevLayerNodes[i] * Weights[i];
-                }
-            }
-
-            sum += Bias;
-
-            switch(ActivationFunction)
-            {
-                case ActivationFunction.ReLu:
-                    return Math.Max(0d, sum);
-                case ActivationFunction.ELU:
-                    return sum >= 0d ? sum : 1d * (Math.Exp(sum) - 1d);
-                default:
-                    throw new NotSupportedException("Unsupported activation function.");
-            }
-        }
-
-        public void SetRandomWeightsBiass(int numWeights)
-        {
-            Weights = new double[numWeights];
-            for (int i = 0; i < numWeights; i++)
-            {
-                Weights[i] = App.rand.NextDouble();
-            }
-            Bias = App.rand.NextDouble();
-        }
-
-        public Node Clone()
-        {
-            return new Node((double[])this.Weights.Clone(), Bias, ActivationFunction);
-        }
+        Sigmoid,
     }
 }
