@@ -275,20 +275,6 @@ namespace DeepLearningDraft.NN
             Array.Copy(other.matrix, this.matrix, other.matrix.Length);
         }
 
-        public Matrix(DeepLearningDraft.Matrix other)
-        {
-            this.Rows = other.Rows;
-            this.Columns = other.Columns;
-            this.matrix = new double[Rows, Columns];
-            for(int i = 0; i < this.Rows; i++)
-            {
-                for(int j = 0; j < Columns; j++)
-                {
-                    this.matrix[i, j] = other[i, j];
-                }
-            }
-        }
-
         private Matrix(double[] vector, bool vertical)
         {
             if (vertical)

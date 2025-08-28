@@ -64,9 +64,6 @@
     <Compile Include="HalfAdderDataset.cs" />
     <Compile Include="IDataset.cs" />
     <Compile Include="ImageDataset.cs" />
-    <Compile Include="Matrix.cs" />
-    <Compile Include="NeuralNetwork.cs" />
-    <Compile Include="NMath.cs" />
     <Compile Include="NN\Mathf.cs" />
     <Compile Include="NN\Matrix.cs" />
     <Compile Include="NN\NN.cs" />

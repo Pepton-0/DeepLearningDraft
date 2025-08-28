@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Path = System.IO.Path;
+using DeepLearningDraft.NN;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.RightsManagement;

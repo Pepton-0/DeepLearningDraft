@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Windows.Shapes;
 
 namespace DeepLearningDraft.NN
 {
@@ -230,6 +231,11 @@ namespace DeepLearningDraft.NN
         public Matrix[] LossDifferential(Matrix input, Matrix answer)
         {
             var (nodes, nonActivatedNodes) = CalculateAllNodesWithNonActivated(input);
+            Log.Line("Nodes dump");
+            for (int i = 0; i < nodes.Length; i++)
+            {
+                nodes[i].Dump();
+            }
             var diffCollection = new Matrix[WeightsAndBiases.GetLength(0)];
 
             // dl_dz = layerNode - answer; row matrix
@@ -283,6 +289,13 @@ namespace DeepLearningDraft.NN
 
                 lastBiasDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c] = d; });
                 lastWeightDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c + 1] = d; });
+
+                Log.Line("Dump trace in GradientDifferential");
+                
+                lastBiasDiffs.Dump();
+                lastWeightDiffs.Dump();
+                diffMatrix.Dump();
+                diffCollection[indexFromHidden].Dump();
             }
 
             return diffCollection;
@@ -298,6 +311,7 @@ namespace DeepLearningDraft.NN
         {
             Matrix[] diffSum = null;
 
+            /*
             for (int i = 0; i < inputs.Length; i++)
             {
                 var diff = LossDifferential(inputs[i], answers[i]);
@@ -310,14 +324,14 @@ namespace DeepLearningDraft.NN
                         diffSum[j] += diff[j];
                     }
                 }
-            }
+            }*/
+            diffSum = LossDifferential(inputs[0], answers[0]);
 
             for (int i = 0; i < diffSum.Length; i++)
             {
                 var layer = diffSum[i];
-                layer.Execute((d) => d / inputs.Length);
+                layer.Execute((d) => d / inputs.Length * learningRate);
                 WeightsAndBiases[i] -= layer;
-                layer.Execute(d => learningRate * d);
                 Log.Line($"Add diff to layer[{i}]");
                 layer.Dump();
             }
@@ -333,5 +347,24 @@ namespace DeepLearningDraft.NN
             var loss = LossAvgFromInputs(inputs, answers);
             Log.Line($"Loss score: {loss}");
         }
+    }
+
+    public struct IntFuncPair
+    {
+        public int Integer;
+        public ActivationFunction Func;
+
+        public IntFuncPair(int integer, ActivationFunction func)
+        {
+            this.Integer = integer;
+            this.Func = func;
+        }
+    }
+
+    public enum ActivationFunction
+    {
+        ReLu,
+        ELU,
+        Sigmoid,
     }
 }
