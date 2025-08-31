@@ -38,19 +38,39 @@ namespace DeepLearningDraft
                 nn.Calculate(new NN.Matrix(dataset.GetSample(i, false).inputs)).Dump();
             */
 
+            Matrix a = new Matrix(new double[,] { { 2, 5 }, { -1, 0 } });
+            Matrix b = new Matrix(new double[,] { { -4, 1 }, { 3, 7 } });
+            Log.Line("a + b =");
+            (a + b).Dump();
+
+            return;
+            
             var simpleDataset = new HalfAdderDataset();
             var nn = new NN.NN(
-                1,
+                8,
                 new IntFuncPair(2, ActivationFunction.Sigmoid),
                 new IntFuncPair(3, ActivationFunction.Sigmoid),
                 new IntFuncPair(2, ActivationFunction.Sigmoid)
                 );
+            
+            /*
+            var simpleDataset = new ImageDataset(@"C:\Users\Kent2\Desktop\MyProgram\WPF\DeepLearningDraft\archive\");
+            var nn = new NN.NN(
+                1d,
+                new IntFuncPair(28 * 28, ActivationFunction.Sigmoid),
+                new IntFuncPair(8, ActivationFunction.Sigmoid),
+                new IntFuncPair(8, ActivationFunction.Sigmoid),
+                new IntFuncPair(10, ActivationFunction.Sigmoid)
+                );*/
             Log.Line("Simple test");
 
             for (int i = 0; i < 4; i++)
                 nn.Calculate(new NN.Matrix(simpleDataset.GetSample(i, false).inputs)).Dump();
 
-            while(true)
+            Log.Line("Dump weights and biases");
+            nn.Dump();
+
+            while(false)
             for(int batch = 0; batch < 1; batch++)
             {
                 int batchNum = 4;
@@ -61,13 +81,18 @@ namespace DeepLearningDraft
                 {
                     var datasetIndex = batch * batchNum + i;
                     var pair = simpleDataset.GetSample(datasetIndex, false);
-                    inputs[i] = new NN.Matrix(pair.inputs);
-                    answers[i] = new NN.Matrix(pair.desiredOutputs);
+                    inputs[i] = pair.inputs.Clone();
+                    answers[i] = pair.desiredOutputs.Clone();
                 }
 
-                Log.Line($"Current Loss: {nn.LossAvgFromInputs(inputs, answers)}");
-                nn.GradientDecent(inputs, answers, 1);
+                nn.GradientDecent(inputs, answers, 0.21);
                 nn.EvaluateByLoss(inputs, answers);
+                    nn.EvaluateByQuestions(inputs, answers, (output, answer) =>
+                        {
+                            var (oR, oC, oD) = output.MaxCell();
+                            var (aR, aC, aD) = answer.MaxCell();
+                            return oR == aR;
+                        });
             }
         }
     }

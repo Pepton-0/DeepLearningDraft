@@ -61,11 +61,39 @@ namespace DeepLearningDraft.NN
         }
 
         /// <summary>
-        /// Fill all the values with random values between 0(inclusive) and 1(exclusive).<br/>
+        /// Fill all the values with random values between -1(exclusive) and 1(exclusive).<br/>
         /// </summary>
         public void Randomize()
         {
-            FillFunc((r,c)=>App.rand.NextDouble()); // 0(inclusive) ~ 1(exclusive)
+
+            FillFunc((r, c) =>
+            {
+                var d = App.rand.NextDouble();
+                if (App.rand.Next() % 2 == 0)
+                    d *= -1d;
+                return d;
+            }); // 0(inclusive) ~ 1(exclusive)
+        }
+
+        public (int r, int c, double d) MaxCell()
+        {
+            int row = 0, col = 0;
+            double d = double.NegativeInfinity;
+            for (int r = 0;r < Rows; r++)
+            {
+                for(int c = 0;c < Columns; c++)
+                {
+                    var value = this[r, c];
+                    if (value > d)
+                    {
+                        d = value;
+                        row = r;
+                        col = c;
+                    }
+                }
+            }
+
+            return (row, col, d);
         }
 
         public Matrix Transpose()

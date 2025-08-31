@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -163,7 +164,6 @@ namespace DeepLearningDraft.NN
                 costs[i] = LossFromInputs(inputs[i], answers[i]);
             }
             Array.Sort(costs);
-            try
             {
                 double sum = 0;
                 int counter = 0;
@@ -174,21 +174,14 @@ namespace DeepLearningDraft.NN
                     sum += costs[i];
                 }
 
-                if (counter <= 3)
-                    throw new ArgumentException();
-                else if (double.IsInfinity(sum))
-                    throw new InvalidOperationException();
+                if (counter <= 3 || double.IsInfinity(sum))
+                    goto CalculationFailed;
 
                 return sum / counter;
             }
-            catch (Exception e) // includes OverflowException
-            {
-                if (e is ArgumentException)
-                    Log.Line("Samples are not enough");
-                else if (e is InvalidOperationException)
-                    Log.Line("Sum became infinity");
-                return costs[costs.Length / 2];
-            }
+
+        CalculationFailed:
+            return costs[costs.Length / 2];
         }
 
         /// <summary>
@@ -231,11 +224,12 @@ namespace DeepLearningDraft.NN
         public Matrix[] LossDifferential(Matrix input, Matrix answer)
         {
             var (nodes, nonActivatedNodes) = CalculateAllNodesWithNonActivated(input);
+            /*
             Log.Line("Nodes dump");
             for (int i = 0; i < nodes.Length; i++)
             {
                 nodes[i].Dump();
-            }
+            }*/
             var diffCollection = new Matrix[WeightsAndBiases.GetLength(0)];
 
             // dl_dz = layerNode - answer; row matrix
@@ -290,12 +284,13 @@ namespace DeepLearningDraft.NN
                 lastBiasDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c] = d; });
                 lastWeightDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c + 1] = d; });
 
+                /*
                 Log.Line("Dump trace in GradientDifferential");
                 
                 lastBiasDiffs.Dump();
                 lastWeightDiffs.Dump();
                 diffMatrix.Dump();
-                diffCollection[indexFromHidden].Dump();
+                diffCollection[indexFromHidden].Dump();*/
             }
 
             return diffCollection;
@@ -311,7 +306,6 @@ namespace DeepLearningDraft.NN
         {
             Matrix[] diffSum = null;
 
-            /*
             for (int i = 0; i < inputs.Length; i++)
             {
                 var diff = LossDifferential(inputs[i], answers[i]);
@@ -319,21 +313,21 @@ namespace DeepLearningDraft.NN
                     diffSum = diff;
                 else
                 {
-                    for(int j = 0; j <  diffSum.Length; j++)
+                    for(int j = 0; j < diffSum.Length; j++)
                     {
                         diffSum[j] += diff[j];
                     }
                 }
-            }*/
-            diffSum = LossDifferential(inputs[0], answers[0]);
+            }
+            //diffSum = LossDifferential(inputs[0], answers[0]);
 
             for (int i = 0; i < diffSum.Length; i++)
             {
                 var layer = diffSum[i];
                 layer.Execute((d) => d / inputs.Length * learningRate);
                 WeightsAndBiases[i] -= layer;
-                Log.Line($"Add diff to layer[{i}]");
-                layer.Dump();
+                // Log.Line($"Add diff to layer[{i}]");
+                // layer.Dump();
             }
         }
 
@@ -344,8 +338,33 @@ namespace DeepLearningDraft.NN
         /// <param name="answers"></param>
         public void EvaluateByLoss(Matrix[] inputs, Matrix[] answers)
         {
+
             var loss = LossAvgFromInputs(inputs, answers);
+            /*
+            for(int i = 0; i < WeightsAndBiases.Length; i++)
+            {
+                WeightsAndBiases[i].Dump();
+            }*/
             Log.Line($"Loss score: {loss}");
+        }
+
+        public void EvaluateByQuestions(Matrix[] inputs, Matrix[] answers, Func<Matrix, Matrix, bool> checker)
+        {
+            int sum = 0;
+            int qualified = 0;
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                var input = inputs[i];
+                var answer = answers[i];
+
+                var output = Calculate(input);
+                var check = checker(output, answer);
+                if (check)
+                    qualified++;
+                sum++;
+            }
+
+            Log.Line($"{{Correct/Questions}} = {qualified.ToString("000")}/{sum.ToString("000")} = rate: {((double)qualified/sum).ToString("0.000")}");
         }
     }
 
