@@ -1,13 +1,15 @@
-﻿using System;
+﻿using MathNet.Numerics.LinearAlgebra;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Controls;
+using InternalMatrix = MathNet.Numerics.LinearAlgebra.Matrix<double>;
 
-namespace DeepLearningDraft.NN
+namespace DeepLearningDraft
 {
     public abstract class MatrixBase
     {
@@ -21,12 +23,12 @@ namespace DeepLearningDraft.NN
             Log.Line($"row:column={Rows}:{Columns}");
             for (int j = 0; j < Rows; j++)
             {
-                Trace.Write("    ");
+                Log.NativeLine("    ");
                 for (int k = 0; k < Columns; k++)
                 {
-                    Trace.Write(this[j, k].ToString("000.000") + " ");
+                    Log.NativeLine(this[j, k].ToString("+000.000;-000.000;0000.000") + " ");
                 }
-                Trace.WriteLine("");
+                Log.NativeLine("\n");
             }
         }
 
@@ -36,9 +38,9 @@ namespace DeepLearningDraft.NN
         /// <param name="func"></param>
         public void Execute(Func<double, double> func)
         {
-            for(int i = 0;i < Rows; i++)
+            for (int i = 0; i < Rows; i++)
             {
-                for(int j = 0; j < Columns; j++)
+                for (int j = 0; j < Columns; j++)
                 {
                     this[i, j] = func(this[i, j]);
                 }
@@ -49,11 +51,11 @@ namespace DeepLearningDraft.NN
         /// Fill each value with return value of the func whic refers row and column
         /// </summary>
         /// <param name="func"></param>
-        public void FillFunc(Func<int,int,double> func)
+        public void FillFunc(Func<int, int, double> func)
         {
-            for(int r = 0; r <  Rows; r++)
+            for (int r = 0; r < Rows; r++)
             {
-                for( int c = 0; c < Columns; c++)
+                for (int c = 0; c < Columns; c++)
                 {
                     this[r, c] = func(r, c);
                 }
@@ -65,11 +67,10 @@ namespace DeepLearningDraft.NN
         /// </summary>
         public void Randomize()
         {
-
             FillFunc((r, c) =>
             {
-                var d = App.rand.NextDouble();
-                if (App.rand.Next() % 2 == 0)
+                var d = NN.rand.NextDouble();
+                if (NN.rand.Next() % 2 == 0)
                     d *= -1d;
                 return d;
             }); // 0(inclusive) ~ 1(exclusive)
@@ -79,9 +80,9 @@ namespace DeepLearningDraft.NN
         {
             int row = 0, col = 0;
             double d = double.NegativeInfinity;
-            for (int r = 0;r < Rows; r++)
+            for (int r = 0; r < Rows; r++)
             {
-                for(int c = 0;c < Columns; c++)
+                for (int c = 0; c < Columns; c++)
                 {
                     var value = this[r, c];
                     if (value > d)
@@ -100,9 +101,9 @@ namespace DeepLearningDraft.NN
         {
             var transposed = new Matrix(Columns, Rows);
 
-            for(int r = 0; r < Rows; r++)
+            for (int r = 0; r < Rows; r++)
             {
-                for(int  c = 0; c < Columns; c++)
+                for (int c = 0; c < Columns; c++)
                 {
                     transposed[c, r] = this[r, c];
                 }
@@ -113,7 +114,7 @@ namespace DeepLearningDraft.NN
 
         public void HadamarProduct(Matrix a)
         {
-            if(this.Rows == a.Rows && this.Columns == a.Columns)
+            if (this.Rows == a.Rows && this.Columns == a.Columns)
             {
                 this.FillFunc((r, c) => this[r, c] * a[r, c]);
             }
@@ -123,11 +124,11 @@ namespace DeepLearningDraft.NN
             }
         }
 
-        public void RunFuncForEachCell(Action<int,int, double> func)
+        public void RunFuncForEachCell(Action<int, int, double> func)
         {
-            for(int i = 0; i < Rows; i++)
+            for (int i = 0; i < Rows; i++)
             {
-                for(int j = 0; j < Columns; j++)
+                for (int j = 0; j < Columns; j++)
                 {
                     func(i, j, this[i, j]);
                 }
@@ -140,11 +141,11 @@ namespace DeepLearningDraft.NN
                 throw new ArgumentException("Columns are not the same");
 
             var matrix = new Matrix(top.Rows + bottom.Rows, top.Columns);
-            for(int i = 0; i < matrix.Columns; i++)
+            for (int i = 0; i < matrix.Columns; i++)
             {
-                for(int j = 0; j < top.Rows; j++)
+                for (int j = 0; j < top.Rows; j++)
                 {
-                    matrix[j,i] = top[j,i];
+                    matrix[j, i] = top[j, i];
                 }
                 for (int j = 0; j < bottom.Rows; j++)
                 {
@@ -162,9 +163,9 @@ namespace DeepLearningDraft.NN
 
             var ripped = new Matrix(a.Rows, end - begin);
 
-            for(int col = begin; col < end; col++)
+            for (int col = begin; col < end; col++)
             {
-                for(int row = 0; row < a.Rows; row++)
+                for (int row = 0; row < a.Rows; row++)
                 {
                     ripped[row, col - begin] = a[row, col];
                 }
@@ -244,7 +245,15 @@ namespace DeepLearningDraft.NN
             {
                 throw new ArgumentException("Number of columns in the first matrix must match number of rows in the second matrix.");
             }
+
+            if (a is FMatrix && b is FMatrix)
+            {
+                a = (FMatrix)a;
+                b = (FMatrix)b;
+            }
+
             var v = new Matrix(a.Rows, b.Columns);
+
             for (int i = 0; i < a.Rows; i++)
             {
                 for (int j = 0; j < b.Columns; j++)
@@ -268,7 +277,15 @@ namespace DeepLearningDraft.NN
         public override double this[int row, int column]
         {
             get => matrix[row, column];
-            set => matrix[row, column] = value;
+            set
+            {
+                /*
+                if(value > 1000000d || !double.IsNormal(value))
+                {
+                    Log.Line($"Value {value} is odd");
+                }*/
+                matrix[row, column] = value;
+            }
         }
 
         public Matrix(int rows, int columns)
@@ -339,12 +356,22 @@ namespace DeepLearningDraft.NN
             return new Matrix(this);
         }
 
+        public InternalMatrix CloneOptMatrix()
+        {
+            return FMatrix.builder.DenseOfArray(this.matrix);
+        }
+
+        public double[,] GetRaw()
+        {
+            return this.matrix;
+        }
+
         /// <summary>
         /// Horizontal vector 
         /// </summary>
         /// <param name="vec"></param>
         /// <returns></returns>
-        public static Matrix FromCVector(double[] vec)
+        public static Matrix FromCVector(params double[] vec)
         {
             return new Matrix(vec, false);
         }
@@ -354,9 +381,38 @@ namespace DeepLearningDraft.NN
         /// </summary>
         /// <param name="vec"></param>
         /// <returns></returns>
-        public static Matrix FromRVector(double[] vec)
+        public static Matrix FromRVector(params double[] vec)
         {
             return new Matrix(vec, true);
+        }
+    }
+
+    public class FMatrix : Matrix
+    {
+        public static readonly MatrixBuilder<double> builder = InternalMatrix.Build;
+        private readonly InternalMatrix matrix;
+
+        public override double this[int row, int col]
+        {
+            get => matrix[row, col];
+            set => matrix[row, col] = value;
+        }
+
+        public override int Rows { get; protected set; }
+        public override int Columns { get; protected set; }
+
+        public FMatrix(Matrix from) : this(from.CloneOptMatrix()) { }
+
+        private FMatrix(InternalMatrix arg) : base(0, 0)
+        {
+            matrix = arg;
+            Rows = arg.RowCount;
+            Columns = arg.ColumnCount;
+        }
+
+        public override Matrix Clone()
+        {
+            return new FMatrix(matrix.Clone());
         }
     }
 }

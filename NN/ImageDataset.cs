@@ -3,14 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Path = System.IO.Path;
-using DeepLearningDraft.NN;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Security.RightsManagement;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Markup;
-using System.Windows.Shapes;
 
 namespace DeepLearningDraft
 {
@@ -109,7 +106,7 @@ namespace DeepLearningDraft
         /// <param name="index"></param>
         /// <param name="test"></param>
         /// <returns></returns>
-        public (Matrix inputs, Matrix desiredOutputs) GetSample(int index, bool test)
+        public (Matrix input, Matrix desiredOutput) GetSample(int index, bool test)
         {
             var pair = test ? TestPair[index] : TrainingPair[index];
 
@@ -120,7 +117,7 @@ namespace DeepLearningDraft
 
         public int GetSampleCount(bool test)
         {
-            if(test)
+            if (test)
             {
                 return TestPair.Length;
             }
@@ -150,7 +147,7 @@ namespace DeepLearningDraft
 #endif
                 Log.Line($"Number of labels: {num}");
                 byte[] labelBuffer = new byte[num];
-                fs.Read(labelBuffer, 0, num);
+                fs.Read(labelBuffer, 0, num); // labels are already randomized
 
                 return labelBuffer;
             }
@@ -202,7 +199,7 @@ namespace DeepLearningDraft
                 // Draw one example image
 
                 int exampleIndex = 0;
-                for(int i = 0; i < rows; i++)
+                for (int i = 0; i < rows; i++)
                 {
                     for (int j = 0; j < cols; j++)
                     {
@@ -236,4 +233,3 @@ namespace DeepLearningDraft
         }
     }
 }
-    

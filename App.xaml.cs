@@ -7,7 +7,6 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using System.Windows;
-using DeepLearningDraft.NN;
 
 namespace DeepLearningDraft
 {
@@ -20,79 +19,216 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            // foobar()
+            Task.Run(() => { ImageLearn(); });
+        }
 
-            /*
-            var nn = new NN.NN(
-                new IntFuncPair(28 * 28, ActivationFunction.Sigmoid),
-                new IntFuncPair(8, ActivationFunction.Sigmoid),
-                new IntFuncPair(8, ActivationFunction.Sigmoid),
-                new IntFuncPair(10, ActivationFunction.Sigmoid)
-                );
-            nn.Dump();
+        static void ImageLearn()
+        {
+            var dataset = new ImageDataset("C:\\Users\\Kent2\\Desktop\\MyProgram\\WPF\\DeepLearningDraft\\archive");
+            (var input, var desiredOutput) = dataset.GetSample(0, false);
 
-            var dataset = new ImageDataset(@"C:\Users\Kent2\Desktop\MyProgram\WPF\DeepLearningDraft\archive\");
+            Log.Line("Sample input:");
+            input.Dump();
 
-            Log.Line("Test: ");
-            for (int i = 0; i < 10; i++)
-                nn.Calculate(new NN.Matrix(dataset.GetSample(i, false).inputs)).Dump();
-            */
+            Log.Line("Sample answer:");
+            desiredOutput.Dump();
 
-            Matrix a = new Matrix(new double[,] { { 2, 5 }, { -1, 0 } });
-            Matrix b = new Matrix(new double[,] { { -4, 1 }, { 3, 7 } });
-            Log.Line("a + b =");
-            (a + b).Dump();
+            var nn = NN.CreateFromFileOrNew("nn.xml", 8,
+                LossFunction.CrossEntropy,
+                new IntFuncPair(28 * 28, ActivationFunction.ReLu),
+                new IntFuncPair(512, ActivationFunction.ReLu),
+                new IntFuncPair(128, ActivationFunction.ReLu),
+                new IntFuncPair(10, ActivationFunction.Linear));
 
-            return;
-            
-            var simpleDataset = new HalfAdderDataset();
-            var nn = new NN.NN(
-                8,
+            Log.Line("Sample calculation:");
+            nn.Calculate(input).Dump();
+
+            int batch = 10;
+            int trainNum = dataset.GetSampleCount(false);
+            for (int epoch = 0; epoch < 10; epoch++)
+            {
+                for (int _ = 0; _ < trainNum / batch; _++)
+                {
+                    var inputs = new Matrix[batch];
+                    var answers = new Matrix[batch];
+                    double learningRate = 0.001;
+                    for (int i = 0; i < batch; i++)
+                    {
+                        (inputs[i], answers[i]) = dataset.GetSample(NN.rand.Next(trainNum), false);
+                    }
+                    nn.Backpropagate(inputs, answers, learningRate);
+                    nn.EvaluateByLoss(inputs, answers);
+
+                    if (false)
+                        nn.EvaluateByQuestions(inputs, answers, (pred, ans) =>
+                        {
+                            return pred.MaxCell().r == ans.MaxCell().r;
+
+                            /*
+                            pred.Execute((d) => d < 0.5d ? 0d : 1d);
+                            int counter = 0;
+                            pred.RunFuncForEachCell((r, c, d) =>
+                            {
+                                if (d == ans[r, c])
+                                    counter++;
+                            });
+                            return counter == ans.Rows;*/
+                        });
+                    if (_ % 1000 == 0)
+                        nn.SaveToFile("nn.xml");
+                }
+            }
+        }
+
+        static void ImageTest()
+        {
+            var dataset = new ImageDataset("C:\\Users\\Kent2\\Desktop\\MyProgram\\WPF\\DeepLearningDraft\\archive");
+            var nn = NN.CreateFromFileOrNew("nn.xml", 8,
+                LossFunction.CrossEntropy,
+                new IntFuncPair(28 * 28, ActivationFunction.ReLu),
+                new IntFuncPair(512, ActivationFunction.ReLu),
+                new IntFuncPair(128, ActivationFunction.ReLu),
+                new IntFuncPair(10, ActivationFunction.Linear));
+
+
+
+            int batch = dataset.GetSampleCount(true);
+            var inputs = new Matrix[batch];
+            var answers = new Matrix[batch];
+            for (int i = 0; i < batch; i++)
+            {
+                var pair = dataset.GetSample(i, true);
+                inputs[i] = pair.input;
+                answers[i] = pair.desiredOutput;
+            }
+            nn.EvaluateByQuestions(inputs, answers, (output, answer) =>
+            {
+                return output.MaxCell().r == answer.MaxCell().r;
+            });
+        }
+
+        static void HalfAdderTest()
+        {
+            var dataset = new HalfAdderDataset();
+            (var input, var desiredOutput) = dataset.GetSample(0, false);
+
+            Log.Line("Sample input:");
+            input.Dump();
+
+            Log.Line("Sample output:");
+            desiredOutput.Dump();
+
+            var nn = new NN(8,
+                LossFunction.SumOfSquareError,
                 new IntFuncPair(2, ActivationFunction.Sigmoid),
                 new IntFuncPair(3, ActivationFunction.Sigmoid),
-                new IntFuncPair(2, ActivationFunction.Sigmoid)
-                );
-            
-            /*
-            var simpleDataset = new ImageDataset(@"C:\Users\Kent2\Desktop\MyProgram\WPF\DeepLearningDraft\archive\");
-            var nn = new NN.NN(
-                1d,
-                new IntFuncPair(28 * 28, ActivationFunction.Sigmoid),
-                new IntFuncPair(8, ActivationFunction.Sigmoid),
-                new IntFuncPair(8, ActivationFunction.Sigmoid),
-                new IntFuncPair(10, ActivationFunction.Sigmoid)
-                );*/
-            Log.Line("Simple test");
+                new IntFuncPair(2, ActivationFunction.Sigmoid));
 
-            for (int i = 0; i < 4; i++)
-                nn.Calculate(new NN.Matrix(simpleDataset.GetSample(i, false).inputs)).Dump();
+            // nn.Dump();
+            for (int i = 0; i < 12000; i++)
+            {
+                int batch = 4;
+                var inputs = new Matrix[batch];
+                var answers = new Matrix[batch];
+                double learningRate = 0.3;
 
-            Log.Line("Dump weights and biases");
+                // Log.Line($"{i}th attempt, learning rate:{learningRate}");
+                for (int j = 0; j < batch; j++)
+                {
+                    (inputs[j], answers[j]) = dataset.GetSample(i * batch + j, false);
+                }
+                nn.Backpropagate(inputs, answers, learningRate);
+                nn.EvaluateByLoss(inputs, answers);
+            }
+
             nn.Dump();
 
-            while(false)
-            for(int batch = 0; batch < 1; batch++)
+            Log.Line("OUTPUT matrix = NN(INPUT matrix)");
+            Log.Line("Compare OUTPUT and ANSWER");
+            Log.Line("TEST RESULT: ");
+
+            for (int idx = 0; idx < 4; idx++)
             {
-                int batchNum = 4;
-                var inputs = new NN.Matrix[batchNum];
-                var answers = new NN.Matrix[batchNum];
+                var data = dataset.GetSample(idx, false);
+                Log.Line($"INPUT  No.{idx}");
+                data.input.Dump();
 
-                for(int i = 0; i < batchNum; i++)
+                Log.Line($"OUTPUT No.{idx}");
+                nn.Calculate(data.input).Dump();
+
+                Log.Line($"ANSWER No.{idx}");
+                data.desiredOutput.Dump();
+
+                Log.NativeLine("\n");
+            }
+        }
+
+        static void DifferentiableFuncTest()
+        {
+            int max = 10000;
+            // f(d) = log(d)sin(d)^2 - 0.5
+            //var dataset = new FuncDataset(max, (d) => Math.Log(d) * Math.Pow(Math.Sin(d), 2d) - 0.5d);
+            var dataset = new FuncDataset(max, (d) => Math.Sin(d * Math.PI));
+            (var input, var desiredOutput) = dataset.GetSample(100, false);
+
+            Log.Line("Sample input:");
+            input.Dump();
+
+            Log.Line("Sample answer:");
+            desiredOutput.Dump();
+
+            var nn = new NN(3,
+                LossFunction.SumOfSquareError,
+                new IntFuncPair(1, ActivationFunction.ReLu),
+                new IntFuncPair(24, ActivationFunction.ReLu),
+                new IntFuncPair(24, ActivationFunction.ReLu),
+                new IntFuncPair(1, ActivationFunction.ReLu));
+
+            Log.Line("Sample output:");
+            nn.Calculate(input).Dump();
+
+            for (int j = 0; j < 20; j++)
+            {
+                int batch = 100;
+
+                for (int header = 0; header < batch; header++)
                 {
-                    var datasetIndex = batch * batchNum + i;
-                    var pair = simpleDataset.GetSample(datasetIndex, false);
-                    inputs[i] = pair.inputs.Clone();
-                    answers[i] = pair.desiredOutputs.Clone();
-                }
+                    var amount = (max - header) / batch;
+                    var inputs = new Matrix[amount];
+                    var answers = new Matrix[amount];
+                    double learningRate = 0.3;
 
-                nn.GradientDecent(inputs, answers, 0.21);
-                nn.EvaluateByLoss(inputs, answers);
-                    nn.EvaluateByQuestions(inputs, answers, (output, answer) =>
-                        {
-                            var (oR, oC, oD) = output.MaxCell();
-                            var (aR, aC, aD) = answer.MaxCell();
-                            return oR == aR;
-                        });
+                    for (int i = 0; i < amount; i++)
+                    {
+                        var index = header + i * batch;
+                        (inputs[i], answers[i]) = dataset.GetSample(index, false);
+                    }
+                    nn.Backpropagate(inputs, answers, learningRate);
+                    nn.EvaluateByLoss(inputs, answers);
+                }
+            }
+
+            nn.Dump();
+
+            double[] radians = {
+        0,
+        Math.PI / 10 / Math.PI,
+        Math.PI / 10 * 2 / Math.PI,
+        Math.PI / 10 * 3 / Math.PI,
+        Math.PI / 10 * 4 / Math.PI,
+        Math.PI / 10 * 5 / Math.PI,
+        Math.PI / 10 * 6 / Math.PI,
+        Math.PI / 10 * 7 / Math.PI,
+        Math.PI / 10 * 8 / Math.PI,
+        Math.PI / 10 * 9 / Math.PI,
+        Math.PI / Math.PI };
+            foreach (var radian in radians)
+            {
+                int intRad = (int)((double)max * radian);
+                var data = dataset.GetSample(intRad, false);
+                var output = nn.Calculate(data.input);
+
+                Log.Line($"(Input, Output, Answer) = ({radian:0.000}, {output[0, 0]:0.000}, {data.desiredOutput[0, 0]:0.000})");
             }
         }
     }

@@ -44,5 +44,10 @@ namespace DeepLearningDraft
             Trace.WriteLine(longTrace);
             Trace.Unindent();
         }
+
+        public static void NativeLine(string arg)
+        {
+            Trace.Write(arg);
+        }
     }
 }

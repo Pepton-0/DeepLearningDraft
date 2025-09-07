@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using DeepLearningDraft.NN;
 
 namespace DeepLearningDraft
 {
@@ -18,6 +17,6 @@ namespace DeepLearningDraft
         /// <param name="index"></param>
         /// <param name="test"></param>
         /// <returns></returns>
-        (Matrix inputs, Matrix desiredOutputs) GetSample(int index, bool test);
+        (Matrix input, Matrix desiredOutput) GetSample(int index, bool test);
     }
 }

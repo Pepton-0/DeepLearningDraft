@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using DeepLearningDraft.NN;
 
 namespace DeepLearningDraft
 {
@@ -25,9 +24,9 @@ namespace DeepLearningDraft
             new Matrix(new double[,]{{0},{1}}, true),
         };
 
-        public (Matrix inputs, Matrix desiredOutputs) GetSample(int index, bool test)
+        public (Matrix input, Matrix desiredOutput) GetSample(int index, bool test)
         {
-            return (inputs[index], outputs[index]);
+            return (inputs[index % inputs.Length], outputs[index % outputs.Length]);
         }
 
         public int GetSampleCount(bool test)

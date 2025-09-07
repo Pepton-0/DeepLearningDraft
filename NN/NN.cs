@@ -1,17 +1,33 @@
-﻿using System;
+﻿using MathNet.Numerics.Distributions;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using System.Windows.Shapes;
 
-namespace DeepLearningDraft.NN
+namespace DeepLearningDraft
 {
+    /// <summary>
+    /// Feedfoward neural network and deep learning mechanism
+    /// </summary>
     public class NN
     {
+        private static bool LOG = false;
+
+        /// <summary>
+        /// Use this for every random calculation
+        /// </summary>
+        public static readonly Random rand = new Random();
+
+        /// <summary>
+        /// Used for multithread calculation
+        /// </summary>
+        public static readonly int NUM_WORKER_THREAD = Environment.ProcessorCount;
+
         /// <summary>
         /// Layer node matrix: row matrix
         /// Expanded layer node matrix: row matrix(nodes+1, 1) for bias
@@ -27,11 +43,32 @@ namespace DeepLearningDraft.NN
         /// </summary>
         private readonly int LayerCount;
 
-        private delegate double ActivationFunc(double d);
-        private readonly ActivationFunc[] ActivationFuncs;
-        private readonly ActivationFunc[] ActivationFuncDiffs;
+        private delegate void ActivationFunc(Matrix d);
 
-        public NN(double biasRange, params IntFuncPair[] pairs) : this(Pair2WeightsAndBiases(pairs, biasRange), pairs.Select(s => s.Func).ToArray())
+        /// <summary>
+        /// Used for every layer from first hidden to output layer
+        /// </summary>
+        private readonly ActivationFunc[] ActivationFuncs;
+
+        /// <summary>
+        /// Differential for activation functions
+        /// </summary>
+        private readonly ActivationFunc[] ActivationDiffFuncs;
+
+        private delegate double LossFunc(Matrix output, Matrix answer);
+
+        /// <summary>
+        /// Loss function
+        /// </summary>
+        private readonly LossFunc LossFunc_;
+        private delegate Matrix LossDiffFunc(Matrix output, Matrix answer);
+
+        /// <summary>
+        /// Differential of loss function
+        /// </summary>
+        private readonly LossDiffFunc LossDiffFunc_;
+
+        public NN(double biasRange, LossFunction loss, params IntFuncPair[] pairs) : this(Pair2WeightsAndBiases(pairs, biasRange), pairs.Select(s => s.Func).ToArray(), loss)
         {
             if (pairs.Any(p => p.Integer <= 0))
             {
@@ -39,10 +76,11 @@ namespace DeepLearningDraft.NN
             }
         }
 
-        public NN(Matrix[] weightsAndBiases, ActivationFunction[] funcs)
+        public NN(Matrix[] weightsAndBiases, ActivationFunction[] funcs, LossFunction loss)
         {
             this.WeightsAndBiases = weightsAndBiases;
             this.LayerCount = weightsAndBiases.Length;
+
 
             ActivationFuncs = funcs.Select<ActivationFunction, ActivationFunc>((f) =>
             {
@@ -52,12 +90,14 @@ namespace DeepLearningDraft.NN
                         return Mathf.Sigmoid;
                     case ActivationFunction.ReLu:
                         return Mathf.ReLU;
+                    case ActivationFunction.Linear:
+                        return Mathf.Linear;
                     default:
                         throw new NotImplementedException("The function is not implemented yet");
                 }
             }).ToArray();
 
-            ActivationFuncDiffs = funcs.Select<ActivationFunction, ActivationFunc>((f) =>
+            ActivationDiffFuncs = funcs.Select<ActivationFunction, ActivationFunc>((f) =>
             {
                 switch (f)
                 {
@@ -65,10 +105,26 @@ namespace DeepLearningDraft.NN
                         return Mathf.SigmoidDiff;
                     case ActivationFunction.ReLu:
                         return Mathf.ReLUDiff;
+                    case ActivationFunction.Linear:
+                        return Mathf.LinearDiff;
                     default:
                         throw new NotImplementedException("The function is not implemented yet");
                 }
             }).ToArray();
+
+            switch (loss)
+            {
+                case LossFunction.SumOfSquareError:
+                    this.LossFunc_ = Mathf.Loss_SumOfSquareError;
+                    this.LossDiffFunc_ = Mathf.LossDiff_SumOfSquareError;
+                    break;
+                case LossFunction.CrossEntropy:
+                    this.LossFunc_ = Mathf.Loss_CrossEntropy;
+                    this.LossDiffFunc_ = Mathf.LossDiff_CrossEntropy;
+                    break;
+                default:
+                    throw new NotImplementedException("The function is not implemented yet");
+            }
         }
 
         private static Matrix[] Pair2WeightsAndBiases(IntFuncPair[] pairs, double biasRange)
@@ -78,13 +134,38 @@ namespace DeepLearningDraft.NN
             {
                 var pair = pairs[i];
                 var weight_bias_layer = new Matrix(pair.Integer, pairs[i - 1].Integer + 1);
-                weight_bias_layer.Randomize();
-                weight_bias_layer.FillFunc((r, c) => (c == 0 ? biasRange : 1) * weight_bias_layer[r,c]);
+
+                var wSamples = Normal.Samples(
+                    rand,
+                    0,
+                    Math.Sqrt(2d / (pairs[i - 1].Integer + pair.Integer))
+                    ).GetEnumerator();
+                for (int j = 0; j < 10; j++)
+                {
+                    wSamples.MoveNext();
+                    Log.Line($"wSample:${j},{pairs[i - 1].Integer}:{wSamples.Current}");
+                }
+                weight_bias_layer.FillFunc((r, c) =>
+                {
+                    if (c == 0)
+                    { // is bias
+                        return 0;
+                    }
+                    else // is weight
+                    {
+                        wSamples.MoveNext();
+                        return wSamples.Current;
+                    }
+                });
+
                 matrices[i - 1] = weight_bias_layer;
             }
             return matrices;
         }
 
+        /// <summary>
+        /// Show all the weights and biases of each layer
+        /// </summary>
         public void Dump()
         {
             for (int i = 0; i < LayerCount; i++)
@@ -97,91 +178,92 @@ namespace DeepLearningDraft.NN
 
         private static readonly Matrix DummyMatrix1 = Matrix.Fill1(1, 1);
         /// <summary>
-        /// 
+        /// Calculate the index layer's node activations from previous nodes
         /// </summary>
-        /// <param name="prevNodesAndBiases">Should be row matrix which has all previous node activations</param>
+        /// <param name="prevNodes">Should be row matrix which has all previous node activations</param>
         /// <param name="index"></param>
         /// <returns></returns>
         private Matrix CalculateNextLayer(Matrix prevNodes, int index)
         {
             var currentNodes = WeightsAndBiases[index] * Matrix.CombineRow(DummyMatrix1, prevNodes);
-            currentNodes.Execute((d) => ActivationFuncs[index](d));
+            ActivationFuncs[index](currentNodes);
 
             return currentNodes;
         }
 
         private (Matrix activated, Matrix nonActivated) CalculateNextLayer_WithNonActivated(Matrix prevNodes, int index)
         {
-            var currentNodes = WeightsAndBiases[index] * Matrix.CombineRow(DummyMatrix1, prevNodes);
-            var activated = currentNodes.Clone();
-            currentNodes.Execute((d) => ActivationFuncs[index](d));
+            var nonActivated = WeightsAndBiases[index] * Matrix.CombineRow(DummyMatrix1, prevNodes);
+            var activated = nonActivated.Clone();
+            // activated.Execute((d) => ActivationFuncs[index](d));
+            ActivationFuncs[index](activated);
 
-            return (activated, currentNodes);
+            return (activated, nonActivated);
         }
 
-        public Matrix Calculate(Matrix inputs)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public Matrix Calculate(Matrix input)
         {
-            var matrix = inputs;
-            for(int i = 0; i < LayerCount; i++)
+            var matrix = input;
+            for (int i = 0; i < LayerCount; i++)
             {
                 matrix = CalculateNextLayer(matrix, i);
             }
             return matrix;
         }
 
-        /// <summary>
-        /// From the same size matrix: outputs & answers, calculate loss functions
-        /// Loss = 1/2 * Σ(i=0, i<outputs.Length){(output[i,0] - answer[i,0])^2}
-        /// dL/dOutput[any,0] = output - answer
-        /// </summary>
-        /// <param name="outputs"></param>
-        /// <param name="answers"></param>
-        /// <returns></returns>
-        public double LossFromOutputs(Matrix outputs, Matrix answers)
+        public double LossFromOutputs(Matrix output, Matrix answer)
         {
-            var matrix = outputs - answers;
-            matrix.Execute((d) => d * d);
-            var f = matrix * Matrix.Fill1(1, matrix.Rows);
-            
-            return f[0, 0];
+            return LossFunc_(output, answer);
         }
 
-        public double LossFromInputs(Matrix inputs, Matrix answers)
+        public double LossFromInput(Matrix inputs, Matrix answers)
         {
             return LossFromOutputs(Calculate(inputs), answers);
         }
 
         public double LossAvgFromInputs(Matrix[] inputs, Matrix[] answers)
         {
-            if(inputs.Length != answers.Length)
+            if (inputs.Length != answers.Length)
             {
                 throw new ArgumentException("inputs and answers dont have the same length");
             }
 
-            double[] costs = new double[inputs.Length];
-            for(int i = 0; i <  inputs.Length; i++)
+            var commonBatchNum = inputs.Length / NUM_WORKER_THREAD; // 0~any
+            var lastRemainderIdx = inputs.Length % NUM_WORKER_THREAD - 1;
+            Vector2[] begin_end_arr = new Vector2[NUM_WORKER_THREAD];
+            int lastIndex = 0;
+            for (int i = 0; i < begin_end_arr.Length; i++)
             {
-                costs[i] = LossFromInputs(inputs[i], answers[i]);
+                var reminder = lastRemainderIdx >= i;
+                var batchNum = commonBatchNum + (reminder ? 1 : 0);
+                begin_end_arr[i] = new Vector2(lastIndex, lastIndex + batchNum);
+                lastIndex += batchNum;
             }
-            Array.Sort(costs);
+            var partialSum = Task.WhenAll(Enumerable.Range(0, NUM_WORKER_THREAD).Select(n => Task.Run(() =>
             {
-                double sum = 0;
-                int counter = 0;
-
-                for (int i = costs.Length / 4; i < costs.Length - costs.Length / 4; i++)
+                var localSum = 0d;
+                int begin = (int)begin_end_arr[n].X;
+                int end = (int)begin_end_arr[n].Y;
+                for (int i = begin; i < end; i++)
                 {
-                    counter++;
-                    sum += costs[i];
+                    localSum += LossFromInput(inputs[i], answers[i]);
                 }
 
-                if (counter <= 3 || double.IsInfinity(sum))
-                    goto CalculationFailed;
+                return localSum;
+            }))).GetAwaiter().GetResult();
 
-                return sum / counter;
+            double sum = 0d;
+            for (int i = 0; i < partialSum.Length; i++)
+            {
+                sum += partialSum[i];
             }
 
-        CalculationFailed:
-            return costs[costs.Length / 2];
+            return sum / inputs.Length;
         }
 
         /// <summary>
@@ -200,19 +282,26 @@ namespace DeepLearningDraft.NN
             return matrices;
         }
 
-        public (Matrix[] nodes , Matrix[] nonActivatedNodes) CalculateAllNodesWithNonActivated(Matrix input)
+        public (Matrix[] nodes, Matrix[] nonActivatedNodes) CalculateAllNodesWithNonActivated(Matrix input)
         {
-            var nodes = new Matrix[LayerCount + 1];
+            var activatedNodes = new Matrix[LayerCount + 1];
             var nonActivatedNodes = new Matrix[LayerCount + 1];
-            nodes[0] = input;
+            activatedNodes[0] = input;
             nonActivatedNodes[0] = null;
             for (int i = 1; i <= LayerCount; i++)
             {
-                (nodes[i], nonActivatedNodes[i]) = 
-                    CalculateNextLayer_WithNonActivated(nodes[i - 1], i-1);
+                (activatedNodes[i], nonActivatedNodes[i]) =
+                    CalculateNextLayer_WithNonActivated(activatedNodes[i - 1], i - 1);
+
+                if (LOG)
+                {
+                    Log.Line($"{i}th activatedNodes, nonActivatedNodes");
+                    activatedNodes[i].Dump();
+                    nonActivatedNodes[i].Dump();
+                }
             }
 
-            return (nodes, nonActivatedNodes);
+            return (activatedNodes, nonActivatedNodes);
         }
 
         /// <summary>
@@ -223,7 +312,7 @@ namespace DeepLearningDraft.NN
         /// <returns></returns>
         public Matrix[] LossDifferential(Matrix input, Matrix answer)
         {
-            var (nodes, nonActivatedNodes) = CalculateAllNodesWithNonActivated(input);
+            var (activatedNodes, nonActivatedNodes) = CalculateAllNodesWithNonActivated(input);
             /*
             Log.Line("Nodes dump");
             for (int i = 0; i < nodes.Length; i++)
@@ -244,24 +333,28 @@ namespace DeepLearningDraft.NN
                 var indexFromHidden = layerIndex - 1;
                 var weightAndBias = WeightsAndBiases[indexFromHidden];
                 var diffMatrix = diffCollection[indexFromHidden] = new Matrix(weightAndBias.Rows, weightAndBias.Columns);
-                var layerNode = nodes[layerIndex];
+                var layerNode = activatedNodes[layerIndex];
 
                 // with current loss function, the diff of loss func should be following formula
                 // dl_dz
                 Matrix dL_dNodes;
 
+                if (LOG)
+                {
+                    Log.Line($"Calculate diff for {indexFromHidden}");
+                }
+
                 if (layerIndex == LayerCount)
                 { // if output layer 
-
-                    // dL_dBiases = dL_dNodes ○ ActivationFuncDiff(nonActivatedNodes)
-                    var I = nonActivatedNodes[layerIndex].Clone();
-                    I.Execute(d => ActivationFuncDiffs[indexFromHidden](d));
-
-                    dL_dNodes = layerNode - answer;
-                    lastBiasDiffs = dL_dNodes;
-                    lastBiasDiffs.HadamarProduct(I);
-
-                    lastWeightDiffs = lastBiasDiffs * nodes[layerIndex - 1].Transpose();
+                  // dL_dNodes = layerNode - answer;
+                    dL_dNodes = LossDiffFunc_(layerNode, answer);
+                    if (LOG)
+                    {
+                        Log.Line("dL_dNodes = LossDiffFunc(layerNode, answer)");
+                        dL_dNodes.Dump();
+                        layerNode.Dump();
+                        answer.Dump();
+                    }
                 }
                 else
                 { // if hidden layer
@@ -272,62 +365,138 @@ namespace DeepLearningDraft.NN
                     dL_dNodes =
                         (lastBiasDiffs.Transpose() * Matrix.SelectColumn(lastWeightAndBias, 1, lastWeightAndBias.Columns))
                         .Transpose();
+                    if (LOG)
+                    {
+                        Log.Line($"dL_dNodes[{indexFromHidden}] = dL_dBias[{indexFromHidden} + {1}] * dL_dWeights[{indexFromHidden} + 1]");
+                        dL_dNodes.Dump();
+                        lastBiasDiffs.Transpose().Dump();
+                        Matrix.SelectColumn(lastWeightAndBias, 1, lastWeightAndBias.Columns).Dump();
+                    }
+                }
 
-                    var I = nonActivatedNodes[layerIndex].Clone();
-                    I.Execute(d => ActivationFuncDiffs[indexFromHidden](d));
-                    lastBiasDiffs = dL_dNodes;
-                    lastBiasDiffs.HadamarProduct(I);
+                // dL_dBiases = dL_dNodes ○ ActivationFuncDiff(nonActivatedNodes)
+                var I = nonActivatedNodes[layerIndex].Clone();
+                //I.Execute(d => ActivationDiffFuncs[indexFromHidden](d));
+                ActivationDiffFuncs[indexFromHidden](I);
+                //var I = layerNode.Clone();
+                //I.HadamarProduct(Matrix.Fill1(I.Rows, I.Columns) - I);
+                lastBiasDiffs = dL_dNodes.Clone();
+                lastBiasDiffs.HadamarProduct(I);
 
-                    lastWeightDiffs = lastBiasDiffs * nodes[layerIndex - 1].Transpose();
+                if (LOG)
+                {
+                    Log.Line("dL_dBiases = dL_dNodes 〇 ActivationFuncDiff(nonActivatedNodes)");
+                    lastBiasDiffs.Dump();
+                    dL_dNodes.Dump();
+                    I.Dump();
+                    nonActivatedNodes[layerIndex].Dump();
+                }
+
+                lastWeightDiffs = lastBiasDiffs * activatedNodes[layerIndex - 1].Transpose();
+                if (LOG)
+                {
+                    Log.Line("dL_dWeights = dL_dBiases * activatedNodes[n - 1].Transpose()");
+                    lastWeightDiffs.Dump();
+                    lastBiasDiffs.Dump();
+                    activatedNodes[layerIndex - 1].Transpose().Dump();
+
                 }
 
                 lastBiasDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c] = d; });
                 lastWeightDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c + 1] = d; });
-
-                /*
-                Log.Line("Dump trace in GradientDifferential");
-                
-                lastBiasDiffs.Dump();
-                lastWeightDiffs.Dump();
-                diffMatrix.Dump();
-                diffCollection[indexFromHidden].Dump();*/
             }
 
             return diffCollection;
         }
 
         /// <summary>
-        /// d > 0
+        /// 
         /// </summary>
         /// <param name="inputs"></param>
         /// <param name="answers"></param>
         /// <param name="learningRate"></param>
-        public void GradientDecent(Matrix[] inputs, Matrix[] answers, double learningRate)
+        public void Backpropagate(Matrix[] inputs, Matrix[] answers, double learningRate)
         {
             Matrix[] diffSum = null;
 
-            for (int i = 0; i < inputs.Length; i++)
+            /** Task table
+             * CPU0: OOOOOO
+             * CPU1: OOOOOO
+             * CPU2: OOOOO
+             */
+
+            var commonBatchNum = inputs.Length / NUM_WORKER_THREAD; // 0~any
+            var lastRemainderIdx = inputs.Length % NUM_WORKER_THREAD - 1;
+            Vector2[] begin_end_arr = new Vector2[NUM_WORKER_THREAD];
+            int lastIndex = 0;
+            for (int i = 0; i < begin_end_arr.Length; i++)
             {
-                var diff = LossDifferential(inputs[i], answers[i]);
+                var reminder = lastRemainderIdx >= i;
+                var batchNum = commonBatchNum + (reminder ? 1 : 0);
+                begin_end_arr[i] = new Vector2(lastIndex, lastIndex + batchNum);
+                lastIndex += batchNum;
+                // Log.Line($"Batch{begin_end_arr}:" + begin_end_arr[i]);
+            }
+
+            var partialDiff = Task.WhenAll(Enumerable.Range(0, NUM_WORKER_THREAD).Select(n => Task.Run(() =>
+            {
+                Matrix[] localDiff = null;
+                int begin = (int)begin_end_arr[n].X;
+                int end = (int)begin_end_arr[n].Y;
+                for (int i = begin; i < end; i++)
+                {
+                    var diff = LossDifferential(inputs[i], answers[i]);
+                    if (localDiff == null)
+                        localDiff = diff;
+                    else
+                    {
+                        for (int j = 0; j < localDiff.Length; j++)
+                            localDiff[j] += diff[j];
+                    }
+                }
+
+                return localDiff;
+            }))).GetAwaiter().GetResult();
+
+            for (int i = 0; i < partialDiff.GetLength(0); i++)
+            {
+                var diff = partialDiff[i];
+
                 if (diffSum == null)
                     diffSum = diff;
-                else
+                else if (diff != null)
                 {
-                    for(int j = 0; j < diffSum.Length; j++)
+                    for (int j = 0; j < diff.GetLength(0); j++)
                     {
                         diffSum[j] += diff[j];
                     }
                 }
             }
-            //diffSum = LossDifferential(inputs[0], answers[0]);
 
-            for (int i = 0; i < diffSum.Length; i++)
+            /*
+            for (int i = 0; i < inputs.Length; i++)
             {
-                var layer = diffSum[i];
+                if (LOG)
+                {
+                    Log.Line($"Calculate loss differential for {i}th sample");
+                }
+                var diff = LossDifferential(inputs[i], answers[i]);
+                if (diffSum == null)
+                    diffSum = diff;
+                else
+                {
+                    for (int j = 0; j < diffSum.Length; j++)
+                    {
+                        diffSum[j] += diff[j];
+                    }
+                }
+            }*/
+
+            for (int k = 0; k < diffSum.Length; k++)
+            {
+                var layer = diffSum[k];
                 layer.Execute((d) => d / inputs.Length * learningRate);
-                WeightsAndBiases[i] -= layer;
-                // Log.Line($"Add diff to layer[{i}]");
-                // layer.Dump();
+                WeightsAndBiases[k] -= layer;
             }
         }
 
@@ -350,21 +519,91 @@ namespace DeepLearningDraft.NN
 
         public void EvaluateByQuestions(Matrix[] inputs, Matrix[] answers, Func<Matrix, Matrix, bool> checker)
         {
-            int sum = 0;
-            int qualified = 0;
-            for (int i = 0; i < inputs.Length; i++)
+            var commonBatchNum = inputs.Length / NUM_WORKER_THREAD; // 0~any
+            var lastRemainderIdx = inputs.Length % NUM_WORKER_THREAD - 1;
+            Vector2[] begin_end_arr = new Vector2[NUM_WORKER_THREAD];
+            int lastIndex = 0;
+            for (int i = 0; i < begin_end_arr.Length; i++)
             {
-                var input = inputs[i];
-                var answer = answers[i];
-
-                var output = Calculate(input);
-                var check = checker(output, answer);
-                if (check)
-                    qualified++;
-                sum++;
+                var reminder = lastRemainderIdx >= i;
+                var batchNum = commonBatchNum + (reminder ? 1 : 0);
+                begin_end_arr[i] = new Vector2(lastIndex, lastIndex + batchNum);
+                lastIndex += batchNum;
             }
+            var partialQualified = Task.WhenAll(Enumerable.Range(0, NUM_WORKER_THREAD).Select(n => Task.Run(() =>
+            {
+                var localQualified = 0;
+                int begin = (int)begin_end_arr[n].X;
+                int end = (int)begin_end_arr[n].Y;
+                for (int i = begin; i < end; i++)
+                {
+                    bool satisfied = checker(Calculate(inputs[i]), answers[i]);
+                    if (satisfied)
+                        localQualified++;
+                }
+                return localQualified;
+            }))).GetAwaiter().GetResult();
 
-            Log.Line($"{{Correct/Questions}} = {qualified.ToString("000")}/{sum.ToString("000")} = rate: {((double)qualified/sum).ToString("0.000")}");
+            int qualified = 0;
+            for (int i = 0; i < partialQualified.Length; i++)
+            {
+                qualified += partialQualified[i];
+            }
+            int sum = inputs.Length;
+
+            Log.Line($"{{Correct/Questions}} = {qualified.ToString("000")}/{sum.ToString("000")} = rate: {((double)qualified / sum).ToString("0.000")}");
+        }
+
+        public void SaveToFile(string filename)
+        {
+            var arr = new double[WeightsAndBiases.Sum(m => m.Rows * m.Columns)];
+            int i = 0;
+            for (int l = 0; l < WeightsAndBiases.Length; l++)
+            {
+                var matrix = WeightsAndBiases[l];
+                var row = matrix.Rows;
+                var col = matrix.Columns;
+                for (int r = 0; r < row; r++)
+                {
+                    for (int c = 0; c < col; c++)
+                    {
+                        arr[i] = matrix[r, c];
+                        i++;
+                    }
+                }
+            }
+            SaveSystem.Save(arr, filename);
+        }
+
+        public static NN CreateFromFileOrNew(string filename, double biasRange, LossFunction loss, params IntFuncPair[] pairs)
+        {
+            var arr = SaveSystem.Load<double[]>(filename);
+            if (arr == null)
+            {
+                Log.Line("Created new one");
+                return new NN(biasRange, loss, pairs);
+            }
+            else
+            {
+                var matrices = new Matrix[pairs.Length - 1];
+                int i = 0;
+                for (int l = 1; l < pairs.Length; l++)
+                {
+                    var row = pairs[l].Integer;
+                    var col = pairs[l - 1].Integer + 1;
+                    var matrix = matrices[l - 1] = new Matrix(row, col);
+                    for (int r = 0; r < row; r++)
+                    {
+                        for (int c = 0; c < col; c++)
+                        {
+                            matrix[r, c] = arr[i];
+                            i++;
+                        }
+                    }
+                }
+                var activationFuncs = pairs.Select(pair => pair.Func).ToArray();
+                return new NN(matrices, activationFuncs, loss);
+            }
         }
     }
 
@@ -383,7 +622,13 @@ namespace DeepLearningDraft.NN
     public enum ActivationFunction
     {
         ReLu,
-        ELU,
         Sigmoid,
+        Linear,
+    }
+
+    public enum LossFunction
+    {
+        SumOfSquareError,
+        CrossEntropy
     }
 }
