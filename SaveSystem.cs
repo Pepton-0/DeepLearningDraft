@@ -40,6 +40,47 @@ namespace DeepLearningDraft
             }
         }
 
+        /// <summary>
+        /// Save the buffer to specific file in the following format:<br/>
+        /// byte[] of int: size of buffer<br/>
+        /// byte[] of byte[]: buffer
+        /// </summary>
+        /// <param name="buffer"></param>
+        /// <param name="filename"></param>
+        public static void SaveBuffer(byte[] buffer, string filename)
+        {
+            string path = Path.Combine(SaveDir, filename);
+            using (FileStream fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                using (BufferedStream bs = new BufferedStream(fs))
+                {
+                    int size = buffer.Length;
+                    byte[] sizeData = BitConverter.GetBytes(size);
+                    bs.Write(sizeData, 0, sizeData.Length);
+                    bs.Write(buffer, 0, buffer.Length);
+                    bs.Flush();
+                }
+            }
+        }
+
+        public static byte[] LoadBuffer(string filename)
+        {
+            string path = Path.Combine(SaveDir, filename);
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+            {
+                using (BufferedStream bs = new BufferedStream(fs))
+                {
+                    var sizeData = new byte[sizeof(int)];
+                    bs.Read(sizeData, 0, sizeData.Length);
+                    
+                    var buffer = new byte[BitConverter.ToInt32(sizeData, 0)];
+                    bs.Read(buffer, 0, buffer.Length);
+
+                    return buffer;
+                }
+            }
+        }
+
         public static T Load<T>(string filename) where T : class
         {
             try

@@ -396,6 +396,17 @@ namespace DeepLearningDraft
             base.RunFuncForEachCell(func);
         }
 
+        /// <summary>
+        /// Copy the content of this matrix to a(rowBegin ~ rowBegin+this.Rows,columnBegin ~ this.Columns)
+        /// </summary>
+        /// <param name="rowBegin"></param>
+        /// <param name="columnBegin"></param>
+        /// <param name="a"></param>
+        public void CopyTo(int rowBegin, int columnBegin, Matrix a)
+        {
+            a.matrix.SetSubMatrix(rowBegin, columnBegin, this.matrix);
+        }
+
         public override Matrix Transpose()
         {
             // return base.Transpose();

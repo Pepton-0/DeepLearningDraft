@@ -19,19 +19,7 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            for(int i = 0; i < 3; i++)
-            {
-                Log.Line("Execute all");
-                var a = new Matrix(3, 1);
-                a.Randomize();
-                a.Dump();
-
-                a.Execute(d => d * 10);
-                a.Dump();
-                a.Transpose().Dump();
-            }
-
-            //Task.Run(() => { ImageTest(); });
+            Task.Run(() => { ImageLearn(); });
         }
 
         static void ImageLearn()
@@ -69,6 +57,7 @@ namespace DeepLearningDraft
                         (inputs[i], answers[i]) = dataset.GetSample(NN.rand.Next(trainNum), false);
                     }
                     nn.Backpropagate(inputs, answers, learningRate);
+                    Log.NativeLine($"{_}: ");
                     nn.EvaluateByLoss(inputs, answers);
 
                     if (false)
@@ -102,8 +91,6 @@ namespace DeepLearningDraft
                 new IntFuncPair(128, ActivationFunction.ReLu),
                 new IntFuncPair(10, ActivationFunction.Linear));
 
-
-
             int batch = dataset.GetSampleCount(true);
             var inputs = new Matrix[batch];
             var answers = new Matrix[batch];
@@ -130,7 +117,8 @@ namespace DeepLearningDraft
             Log.Line("Sample output:");
             desiredOutput.Dump();
 
-            var nn = new NN(8,
+            var nn = NN.CreateFromFileOrNew("nnhalf.xml",
+                8,
                 LossFunction.SumOfSquareError,
                 new IntFuncPair(2, ActivationFunction.Sigmoid),
                 new IntFuncPair(3, ActivationFunction.Sigmoid),
@@ -152,6 +140,8 @@ namespace DeepLearningDraft
                 nn.Backpropagate(inputs, answers, learningRate);
                 nn.EvaluateByLoss(inputs, answers);
             }
+
+            nn.SaveToFile("nnhalf.xml");
 
             nn.Dump();
 
