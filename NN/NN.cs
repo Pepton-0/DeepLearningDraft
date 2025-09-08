@@ -363,14 +363,14 @@ namespace DeepLearningDraft
                     // = (dL_dBias(next).Transpose() * weightMatrix(next)).Transpose()
                     var lastWeightAndBias = WeightsAndBiases[indexFromHidden + 1];
                     dL_dNodes =
-                        (lastBiasDiffs.Transpose() * Matrix.SelectColumn(lastWeightAndBias, 1, lastWeightAndBias.Columns))
+                        (lastBiasDiffs.Transpose() * lastWeightAndBias.SelectColumn(1, lastWeightAndBias.Columns))
                         .Transpose();
                     if (LOG)
                     {
                         Log.Line($"dL_dNodes[{indexFromHidden}] = dL_dBias[{indexFromHidden} + {1}] * dL_dWeights[{indexFromHidden} + 1]");
                         dL_dNodes.Dump();
                         lastBiasDiffs.Transpose().Dump();
-                        Matrix.SelectColumn(lastWeightAndBias, 1, lastWeightAndBias.Columns).Dump();
+                        lastWeightAndBias.SelectColumn(1, lastWeightAndBias.Columns).Dump();
                     }
                 }
 
@@ -402,8 +402,8 @@ namespace DeepLearningDraft
 
                 }
 
-                lastBiasDiffs.CopyTo(0, 0, diffMatrix);
-                lastWeightDiffs.CopyTo(0, 1, diffMatrix);
+                //lastBiasDiffs.CopyTo(0, 0, diffMatrix);
+                //lastWeightDiffs.CopyTo(0, 1, diffMatrix);
                 //lastBiasDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c] = d; });
                 //lastWeightDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c + 1] = d; });
             }
@@ -443,8 +443,9 @@ namespace DeepLearningDraft
             var partialDiff = Task.WhenAll(Enumerable.Range(0, NUM_WORKER_THREAD).Select(n => Task.Run(() =>
             {
                 Matrix[] localDiff = null;
-                int begin = (int)begin_end_arr[n].X;
-                int end = (int)begin_end_arr[n].Y;
+                var vec = begin_end_arr[n];
+                int begin = vec.X;
+                int end = vec.Y;
                 for (int i = begin; i < end; i++)
                 {
                     var diff = LossDifferential(inputs[i], answers[i]);
@@ -535,8 +536,9 @@ namespace DeepLearningDraft
             var partialQualified = Task.WhenAll(Enumerable.Range(0, NUM_WORKER_THREAD).Select(n => Task.Run(() =>
             {
                 var localQualified = 0;
-                int begin = (int)begin_end_arr[n].X;
-                int end = (int)begin_end_arr[n].Y;
+                var vec = begin_end_arr[n];
+                int begin = vec.X;
+                int end = vec.Y;
                 for (int i = begin; i < end; i++)
                 {
                     bool satisfied = checker(Calculate(inputs[i]), answers[i]);

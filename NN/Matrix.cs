@@ -184,18 +184,18 @@ namespace DeepLearningDraft
             return matrix;
         }
 
-        public static Matrix SelectColumn(Matrix a, int begin, int end)
+        public virtual Matrix SelectColumn(int begin, int end)
         {
-            if (begin > end || begin < 0 || end > a.Columns)
+            if (begin > end || begin < 0 || end > this.Columns)
                 throw new ArgumentException("begin and end are not correct args");
 
-            var ripped = new Matrix(a.Rows, end - begin);
+            var ripped = new Matrix(this.Rows, end - begin);
 
             for (int col = begin; col < end; col++)
             {
-                for (int row = 0; row < a.Rows; row++)
+                for (int row = 0; row < this.Rows; row++)
                 {
-                    ripped[row, col - begin] = a[row, col];
+                    ripped[row, col - begin] = this[row, col];
                 }
             }
 
@@ -290,64 +290,6 @@ namespace DeepLearningDraft
         }
     }
 
-    /*
-    public class Matrix : MatrixBase
-    {
-        private readonly double[,] matrix;
-        public override int Rows { get; protected set; }
-        public override int Columns { get; protected set; }
-
-        public override double this[int row, int column]
-        {
-            get => matrix[row, column];
-            set
-            {
-                matrix[row, column] = value;
-            }
-        }
-
-        public Matrix(int rows, int columns)
-        {
-            matrix = new double[rows, columns];
-            this.Rows = rows;
-            this.Columns = columns;
-        }
-
-        public Matrix(double[,] values, bool reuse = false)
-        {
-            this.Rows = values.GetLength(0);
-            this.Columns = values.GetLength(1);
-
-            if (reuse)
-            {
-                this.matrix = values;
-            }
-            else
-            {
-                Array.Copy(values, matrix =
-                    new double[Rows, Columns],
-                    values.Length);
-            }
-        }
-
-        public Matrix(Matrix other)
-        {
-            this.Rows = other.Rows;
-            this.Columns = other.Columns;
-            this.matrix = new double[Rows, Columns];
-            Array.Copy(other.matrix, this.matrix, other.matrix.Length);
-        }
-
-        /// <summary>
-        /// Create copy of this matrix.
-        /// </summary>
-        /// <returns></returns>
-        public override Matrix Clone()
-        {
-            return new Matrix(this);
-        }
-    }*/
-
     public class Matrix : MatrixBase
     {
         public static readonly MatrixBuilder<double> builder = InternalMatrix.Build;
@@ -377,13 +319,12 @@ namespace DeepLearningDraft
 
         public override void Execute(Func<double, double> func)
         {
-            // base.Execute(func);
             matrix.MapInplace(func);
         }
 
         public override void FillFunc(Func<int, int, double> func)
         {
-            base.FillFunc(func);
+            matrix.MapIndexedInplace((r, c, from) => func(r, c));
         }
 
         public override void HadamarProduct(Matrix a)
@@ -393,7 +334,7 @@ namespace DeepLearningDraft
 
         public override void RunFuncForEachCell(Action<int, int, double> func)
         {
-            base.RunFuncForEachCell(func);
+            matrix.MapIndexedInplace((r,c,from) => { func(r,c,from); return from; });
         }
 
         /// <summary>
@@ -416,6 +357,13 @@ namespace DeepLearningDraft
         public override Matrix Clone()
         {
             return new Matrix(this);
+        }
+
+        public override Matrix SelectColumn(int begin, int end)
+        {
+            var extracted = new Matrix(this.Rows, end - begin);
+            matrix.SetSubMatrix(0, 0, 0, end - begin, extracted.matrix);
+            return extracted;
         }
 
         public static Matrix operator +(Matrix a, Matrix b)

@@ -19,7 +19,7 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            Task.Run(() => { ImageLearn(); });
+            Task.Run(() => { DifferentiableFuncTest(); });
         }
 
         static void ImageLearn()
@@ -117,8 +117,7 @@ namespace DeepLearningDraft
             Log.Line("Sample output:");
             desiredOutput.Dump();
 
-            var nn = NN.CreateFromFileOrNew("nnhalf.xml",
-                8,
+            var nn = new NN(4,
                 LossFunction.SumOfSquareError,
                 new IntFuncPair(2, ActivationFunction.Sigmoid),
                 new IntFuncPair(3, ActivationFunction.Sigmoid),
