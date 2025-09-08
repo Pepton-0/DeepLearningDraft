@@ -221,9 +221,9 @@ namespace DeepLearningDraft
             return LossFunc_(output, answer);
         }
 
-        public double LossFromInput(Matrix inputs, Matrix answers)
+        public double LossFromInput(Matrix input, Matrix answer)
         {
-            return LossFromOutputs(Calculate(inputs), answers);
+            return LossFromOutputs(Calculate(input), answer);
         }
 
         public double LossAvgFromInputs(Matrix[] inputs, Matrix[] answers)

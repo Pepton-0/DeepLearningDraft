@@ -246,12 +246,6 @@ namespace DeepLearningDraft
                 throw new ArgumentException("Number of columns in the first matrix must match number of rows in the second matrix.");
             }
 
-            if (a is FMatrix && b is FMatrix)
-            {
-                a = (FMatrix)a;
-                b = (FMatrix)b;
-            }
-
             var v = new Matrix(a.Rows, b.Columns);
 
             for (int i = 0; i < a.Rows; i++)

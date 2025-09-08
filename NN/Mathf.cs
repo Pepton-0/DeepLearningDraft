@@ -113,7 +113,7 @@ namespace DeepLearningDraft
             Softmax(matrix);
             matrix.Execute((d) => Math.Log(d) * -1d);
             matrix.HadamarProduct(answer);
-            var cmatrix = Matrix.Fill1(matrix.Columns, matrix.Rows);
+            var cmatrix = Matrix.Fill1(1, matrix.Rows);
             return (cmatrix * matrix)[0, 0];
         }
 
