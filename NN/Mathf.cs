@@ -4,56 +4,26 @@ namespace DeepLearningDraft
 {
     public class Mathf
     {
-        /*
-        public static double Linear(double x)
-        {
-            return x;
-        }*/
-
         public static void Linear(Matrix x)
         {
             return;
         }
 
-        /*
-        public static double LinearDiff(double x)
-        {
-            return 1;
-        }*/
-
         public static void LinearDiff(Matrix x)
         {
-            x.Execute((d) => 1d); // TODO no need to use prev data
+            x.FillFunc((r,c) => 1d);
         }
-
-        /*
-        public static double Sigmoid(double x)
-        {
-            return 1d / (1d + Math.Exp(-x));
-        }*/
 
         public static void Sigmoid(Matrix x)
         {
             x.Execute((d) => 1d / (1d + Math.Exp(-d)));
         }
 
-        /*
-        public static double SigmoidDiff(double x)
-        {
-            return Sigmoid(x) * (1 - Sigmoid(x));
-        }*/
-
         public static void SigmoidDiff(Matrix x)
         {
             Sigmoid(x);
             x.Execute((d) => d * (1d - d));
         }
-
-        /*
-        public static double ReLU(double x)
-        {
-            return Math.Max(0, x);
-        }*/
 
         public static void ReLU(Matrix x)
         {
@@ -62,16 +32,6 @@ namespace DeepLearningDraft
                 return Math.Max(0, d);
             });
         }
-
-        /*
-        public static double ReLUDiff(double x)
-        {
-            if (x > 0)
-            {
-                return 1;
-            }
-            else return 0; // when x <= 0
-        }*/
 
         public static void ReLUDiff(Matrix x)
         {

@@ -1,5 +1,6 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -36,7 +37,7 @@ namespace DeepLearningDraft
         /// Re-plug in each value with the same function which uses the value
         /// </summary>
         /// <param name="func"></param>
-        public void Execute(Func<double, double> func)
+        public virtual void Execute(Func<double, double> func)
         {
             for (int i = 0; i < Rows; i++)
             {
@@ -51,7 +52,7 @@ namespace DeepLearningDraft
         /// Fill each value with return value of the func whic refers row and column
         /// </summary>
         /// <param name="func"></param>
-        public void FillFunc(Func<int, int, double> func)
+        public virtual void FillFunc(Func<int, int, double> func)
         {
             for (int r = 0; r < Rows; r++)
             {
@@ -76,6 +77,33 @@ namespace DeepLearningDraft
             }); // 0(inclusive) ~ 1(exclusive)
         }
 
+        public byte[] ToByte1DimArr()
+        {
+            int sizeOfDouble = sizeof(double);
+            var bytes = new byte[sizeOfDouble * Rows * Columns];
+            for(int r = 0; r < Rows; r++)
+            {
+                for(int c = 0; c < Columns; c++)
+                {
+                    var partialBytes = BitConverter.GetBytes(this[r, c]);
+                    partialBytes.CopyTo(bytes, (r * Columns + c) * sizeOfDouble);
+                }
+            }
+
+            return bytes;
+        }
+
+        public static Matrix FromByte1DimArr(int rows, int columns, byte[] bytes)
+        {
+            var matrix = new Matrix(rows, columns);
+            int sizeOfDouble = sizeof(double);
+            matrix.FillFunc((r, c) =>
+            {
+                return BitConverter.ToDouble(bytes, sizeOfDouble * (r * columns + c));
+            });
+            return matrix;
+        }
+
         public (int r, int c, double d) MaxCell()
         {
             int row = 0, col = 0;
@@ -97,7 +125,7 @@ namespace DeepLearningDraft
             return (row, col, d);
         }
 
-        public Matrix Transpose()
+        public virtual Matrix Transpose()
         {
             var transposed = new Matrix(Columns, Rows);
 
@@ -112,7 +140,7 @@ namespace DeepLearningDraft
             return transposed;
         }
 
-        public void HadamarProduct(Matrix a)
+        public virtual void HadamarProduct(Matrix a)
         {
             if (this.Rows == a.Rows && this.Columns == a.Columns)
             {
@@ -124,7 +152,7 @@ namespace DeepLearningDraft
             }
         }
 
-        public void RunFuncForEachCell(Action<int, int, double> func)
+        public virtual void RunFuncForEachCell(Action<int, int, double> func)
         {
             for (int i = 0; i < Rows; i++)
             {
@@ -262,6 +290,7 @@ namespace DeepLearningDraft
         }
     }
 
+    /*
     public class Matrix : MatrixBase
     {
         private readonly double[,] matrix;
@@ -273,11 +302,6 @@ namespace DeepLearningDraft
             get => matrix[row, column];
             set
             {
-                /*
-                if(value > 1000000d || !double.IsNormal(value))
-                {
-                    Log.Line($"Value {value} is odd");
-                }*/
                 matrix[row, column] = value;
             }
         }
@@ -314,33 +338,6 @@ namespace DeepLearningDraft
             Array.Copy(other.matrix, this.matrix, other.matrix.Length);
         }
 
-        private Matrix(double[] vector, bool vertical)
-        {
-            if (vertical)
-            {
-                this.Rows = vector.Length;
-                this.Columns = 1;
-                this.matrix = new double[Rows, Columns];
-
-                for (int i = 0; i < Rows; i++)
-                {
-                    this[i, 0] = vector[i];
-                }
-            }
-            else
-            {
-                this.Columns = vector.Length;
-                this.Rows = 1;
-                this.matrix = new double[Rows, Columns];
-
-                for (int i = 0; i < Columns; i++)
-                {
-                    this[0, i] = vector[i];
-                }
-                //Array.Copy(vector, this.matrix, this.matrix.Length); this is not possible :(
-            }
-        }
-
         /// <summary>
         /// Create copy of this matrix.
         /// </summary>
@@ -349,39 +346,9 @@ namespace DeepLearningDraft
         {
             return new Matrix(this);
         }
+    }*/
 
-        public InternalMatrix CloneOptMatrix()
-        {
-            return FMatrix.builder.DenseOfArray(this.matrix);
-        }
-
-        public double[,] GetRaw()
-        {
-            return this.matrix;
-        }
-
-        /// <summary>
-        /// Horizontal vector 
-        /// </summary>
-        /// <param name="vec"></param>
-        /// <returns></returns>
-        public static Matrix FromCVector(params double[] vec)
-        {
-            return new Matrix(vec, false);
-        }
-
-        /// <summary>
-        /// Vertical vector
-        /// </summary>
-        /// <param name="vec"></param>
-        /// <returns></returns>
-        public static Matrix FromRVector(params double[] vec)
-        {
-            return new Matrix(vec, true);
-        }
-    }
-
-    public class FMatrix : Matrix
+    public class Matrix : MatrixBase
     {
         public static readonly MatrixBuilder<double> builder = InternalMatrix.Build;
         private readonly InternalMatrix matrix;
@@ -395,18 +362,64 @@ namespace DeepLearningDraft
         public override int Rows { get; protected set; }
         public override int Columns { get; protected set; }
 
-        public FMatrix(Matrix from) : this(from.CloneOptMatrix()) { }
+        public Matrix(Matrix other) : this(other.matrix.Clone()) { }
 
-        private FMatrix(InternalMatrix arg) : base(0, 0)
+        public Matrix(int rows, int columns) : this(builder.Dense(rows, columns)) { }
+
+        public Matrix(double[,] raw, bool thisValueIsNotUsedAnymore) : this(builder.DenseOfArray(raw)) { } 
+
+        private Matrix(InternalMatrix arg)
         {
             matrix = arg;
             Rows = arg.RowCount;
             Columns = arg.ColumnCount;
         }
 
+        public override void Execute(Func<double, double> func)
+        {
+            // base.Execute(func);
+            matrix.MapInplace(func);
+        }
+
+        public override void FillFunc(Func<int, int, double> func)
+        {
+            base.FillFunc(func);
+        }
+
+        public override void HadamarProduct(Matrix a)
+        {
+            base.HadamarProduct(a);
+        }
+
+        public override void RunFuncForEachCell(Action<int, int, double> func)
+        {
+            base.RunFuncForEachCell(func);
+        }
+
+        public override Matrix Transpose()
+        {
+            // return base.Transpose();
+            return new Matrix(matrix.Transpose());
+        }
+
         public override Matrix Clone()
         {
-            return new FMatrix(matrix.Clone());
+            return new Matrix(this);
+        }
+
+        public static Matrix operator +(Matrix a, Matrix b)
+        {
+            return new Matrix(a.matrix + b.matrix);
+        }
+
+        public static Matrix operator -(Matrix a, Matrix b)
+        {
+            return new Matrix(a.matrix - b.matrix);
+        }
+
+        public static Matrix operator *(Matrix a, Matrix b)
+        {
+            return new Matrix(a.matrix * b.matrix);
         }
     }
 }

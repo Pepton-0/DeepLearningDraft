@@ -16,8 +16,8 @@ Aij = ReLU(w(1)A(i-1, 0) + w(2)A(i-1, 1) + ... + w(n)A(i-1, n) - biass(i))
 
 # Learning
 
-Cost Function
-C =  1/n * Σ (Ank - T())²
+Loss Function
+C =  1/n * Σ (Ank - T(k))²
 where T is the target value
 
-Find the minimum of C using gradient descent
+Find the minimum C using gradient descent

@@ -19,7 +19,19 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            Task.Run(() => { ImageTest(); });
+            for(int i = 0; i < 3; i++)
+            {
+                Log.Line("Execute all");
+                var a = new Matrix(3, 1);
+                a.Randomize();
+                a.Dump();
+
+                a.Execute(d => d * 10);
+                a.Dump();
+                a.Transpose().Dump();
+            }
+
+            //Task.Run(() => { ImageTest(); });
         }
 
         static void ImageLearn()

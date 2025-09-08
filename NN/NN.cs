@@ -556,6 +556,7 @@ namespace DeepLearningDraft
 
         public void SaveToFile(string filename)
         {
+            /*
             var arr = new double[WeightsAndBiases.Sum(m => m.Rows * m.Columns)];
             int i = 0;
             for (int l = 0; l < WeightsAndBiases.Length; l++)
@@ -571,7 +572,9 @@ namespace DeepLearningDraft
                         i++;
                     }
                 }
-            }
+            }*/
+            var arr = WeightsAndBiases.Select(r => r.ToByte1DimArr());
+
             SaveSystem.Save(arr, filename);
         }
 
@@ -585,6 +588,7 @@ namespace DeepLearningDraft
             }
             else
             {
+                /*
                 var matrices = new Matrix[pairs.Length - 1];
                 int i = 0;
                 for (int l = 1; l < pairs.Length; l++)
@@ -600,6 +604,18 @@ namespace DeepLearningDraft
                             i++;
                         }
                     }
+                }*/
+                var matrices = new Matrix[pairs.Length - 1];
+                var idx = 0;
+                for(int l = 1; l < pairs.Length ; l++)
+                {
+                    var row = pairs[l].Integer;
+                    var col = pairs[l - 1].Integer + 1;
+                    var partialBytes = new byte[row * col * sizeof(double)];
+                    Array.Copy(arr, idx, partialBytes, 0, partialBytes.Length);
+                    matrices[l - 1] = Matrix.FromByte1DimArr(row, col, partialBytes);
+
+                    idx += partialBytes.Length;
                 }
                 var activationFuncs = pairs.Select(pair => pair.Func).ToArray();
                 return new NN(matrices, activationFuncs, loss);

@@ -1,5 +1,4 @@
-﻿// #define TEST // for quick test
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using Path = System.IO.Path;
@@ -75,16 +74,16 @@ namespace DeepLearningDraft
             string testLabelPath = Path.Combine(dataDir, "t10k-labels.idx1-ubyte");
             string testImagePath = Path.Combine(dataDir, "t10k-images.idx3-ubyte");
 
-            Log.Line("Load training label");
+            Log.Line("Load training labels");
             var trainLabels = LoadLabelFile(trainLabelPath);
 
-            Log.Line("Load training image");
+            Log.Line("Load training images");
             var trainImages = LoadImageFile(trainImagePath);
 
-            Log.Line("Load test label");
+            Log.Line("Load test labels");
             var testLabels = LoadLabelFile(testLabelPath);
 
-            Log.Line("Load test image");
+            Log.Line("Load test images");
             var testImages = LoadImageFile(testImagePath);
 
             TrainingPair = new ImageLabelPair[trainLabels.Length];
@@ -142,9 +141,6 @@ namespace DeepLearningDraft
                 Log.Line($"Magic number: {magicNumber}");
 
                 int num = ReadInt32(fs); // Read the number of labels
-#if TEST
-                num = 10; // For testing, limit to 10 labels
-#endif
                 Log.Line($"Number of labels: {num}");
                 byte[] labelBuffer = new byte[num];
                 fs.Read(labelBuffer, 0, num); // labels are already randomized
@@ -196,8 +192,7 @@ namespace DeepLearningDraft
 
                 StoreImage(0, num, rows, cols, images, buffer);
 
-                // Draw one example image
-
+                // Draw an example image
                 int exampleIndex = 0;
                 for (int i = 0; i < rows; i++)
                 {
