@@ -19,7 +19,7 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            Task.Run(() => { DifferentiableFuncTest(); });
+            Task.Run(() => { HalfAdderTest(); });
         }
 
         static void ImageLearn()
