@@ -402,8 +402,8 @@ namespace DeepLearningDraft
 
                 }
 
-                //lastBiasDiffs.CopyTo(0, 0, diffMatrix);
-                //lastWeightDiffs.CopyTo(0, 1, diffMatrix);
+                lastBiasDiffs.CopyTo(0, 0, diffMatrix);
+                lastWeightDiffs.CopyTo(0, 1, diffMatrix);
                 //lastBiasDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c] = d; });
                 //lastWeightDiffs.RunFuncForEachCell((r, c, d) => { diffMatrix[r, c + 1] = d; });
             }

@@ -317,6 +317,22 @@ namespace DeepLearningDraft
             Columns = arg.ColumnCount;
         }
 
+        public override Matrix Clone()
+        {
+            return new Matrix(this);
+        }
+
+        /// <summary>
+        /// Copy the content of this matrix to a(rowBegin ~ rowBegin+this.Rows,columnBegin ~ this.Columns)
+        /// </summary>
+        /// <param name="rowBegin"></param>
+        /// <param name="columnBegin"></param>
+        /// <param name="a"></param>
+        public void CopyTo(int rowBegin, int columnBegin, Matrix a)
+        {
+            a.matrix.SetSubMatrix(rowBegin, columnBegin, this.matrix);
+        }
+
         public override void Execute(Func<double, double> func)
         {
             matrix.MapInplace(func);
@@ -337,32 +353,19 @@ namespace DeepLearningDraft
             matrix.MapIndexedInplace((r,c,from) => { func(r,c,from); return from; });
         }
 
-        /// <summary>
-        /// Copy the content of this matrix to a(rowBegin ~ rowBegin+this.Rows,columnBegin ~ this.Columns)
-        /// </summary>
-        /// <param name="rowBegin"></param>
-        /// <param name="columnBegin"></param>
-        /// <param name="a"></param>
-        public void CopyTo(int rowBegin, int columnBegin, Matrix a)
-        {
-            a.matrix.SetSubMatrix(rowBegin, columnBegin, this.matrix);
-        }
-
         public override Matrix Transpose()
         {
             // return base.Transpose();
             return new Matrix(matrix.Transpose());
         }
 
-        public override Matrix Clone()
-        {
-            return new Matrix(this);
-        }
-
         public override Matrix SelectColumn(int begin, int end)
         {
             var extracted = new Matrix(this.Rows, end - begin);
-            matrix.SetSubMatrix(0, 0, 0, end - begin, extracted.matrix);
+            for(int col = begin; col < end; col++)
+            {
+                extracted.matrix.SetColumn(col-begin, this.matrix.Column(col));
+            }
             return extracted;
         }
 
