@@ -1,4 +1,9 @@
-﻿using System;
+﻿using CommunityToolkit.Mvvm.DependencyInjection;
+using DeepLearningDraft.Models;
+using DeepLearningDraft.Models.Services;
+using DeepLearningDraft.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -19,7 +24,14 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            Task.Run(() => { HalfAdderTest(); });
+            // Prepare MVVM application
+            Ioc.Default.ConfigureServices(new ServiceCollection()
+                .AddSingleton<IConfigService, ConfigService>()
+                .AddSingleton<IConductor, Conductor>()
+                .AddTransient<MainWindowViewModel>()
+                .BuildServiceProvider());
+
+            new MainWindow().Show();
         }
 
         static void ImageLearn()

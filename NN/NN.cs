@@ -560,7 +560,7 @@ namespace DeepLearningDraft
 
         public void SaveToFile(string filename)
         {
-            return;
+            // TODO why this causes error?
             /*
             var arr = new double[WeightsAndBiases.Sum(m => m.Rows * m.Columns)];
             int i = 0;
