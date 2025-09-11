@@ -313,12 +313,6 @@ namespace DeepLearningDraft
         public Matrix[] LossDifferential(Matrix input, Matrix answer)
         {
             var (activatedNodes, nonActivatedNodes) = CalculateAllNodesWithNonActivated(input);
-            /*
-            Log.Line("Nodes dump");
-            for (int i = 0; i < nodes.Length; i++)
-            {
-                nodes[i].Dump();
-            }*/
             var diffCollection = new Matrix[WeightsAndBiases.GetLength(0)];
 
             // dl_dz = layerNode - answer; row matrix
@@ -560,7 +554,6 @@ namespace DeepLearningDraft
 
         public void SaveToFile(string filename)
         {
-            // TODO why this causes error?
             /*
             var arr = new double[WeightsAndBiases.Sum(m => m.Rows * m.Columns)];
             int i = 0;
@@ -578,6 +571,7 @@ namespace DeepLearningDraft
                     }
                 }
             }*/
+            // TODO why this causes error?
             var arr = WeightsAndBiases.Select(r => r.ToByte1DimArr()).ToArray();
             var buffer = new byte[arr.Length];
             Buffer.BlockCopy(arr, 0, buffer, 0, buffer.Length);

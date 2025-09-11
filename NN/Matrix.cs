@@ -355,7 +355,6 @@ namespace DeepLearningDraft
 
         public override Matrix Transpose()
         {
-            // return base.Transpose();
             return new Matrix(matrix.Transpose());
         }
 

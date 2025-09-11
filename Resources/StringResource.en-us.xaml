@@ -1,0 +1,17 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:DeepLearningDraft"
+    xmlns:vm="clr-namespace:DeepLearningDraft.ViewModels"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!--converters-->
+    <!--resources-->
+    <SolidColorBrush x:Key="simplebutton_fill" Color="#FF070322"></SolidColorBrush>
+    <SolidColorBrush x:Key="simplebutton_fill_invalid" Color="#FF514F5C"></SolidColorBrush>
+    <!--translations-->
+    <sys:String x:Key="app_name">WinAutoTyper</sys:String>
+    <sys:String x:Key="scan_switch">Scan screen</sys:String>
+    <sys:String x:Key="scan_switch_tooltip">Click to start/stop screen scanning and auto typing</sys:String>
+    <sys:String x:Key="threshold">Scan threshold</sys:String>
+    <sys:String x:Key="threshold_tooltip">Change this value to detect only characters in scan image</sys:String>
+</ResourceDictionary>

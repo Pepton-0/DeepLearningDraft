@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:DeepLearningDraft"
         xmlns:behaviour="clr-namespace:DeepLearningDraft.Behaviours"
+        xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:vm="clr-namespace:DeepLearningDraft.ViewModels"
         behaviour:IocHelper.AutoViewModel="{x:Type vm:MainWindowViewModel}"
         d:DataContext="{d:DesignInstance vm:MainWindowViewModel}"
@@ -12,10 +13,33 @@
         Title="MainWindow" Height="450" Width="800">
     <Grid>
         <DockPanel>
-            <InkCanvas DockPanel.Dock="Left">
-                
-            </InkCanvas>
-            <TextBlock Width="230" FontSize="40" VerticalAlignment="Center">AEE</TextBlock>
+            <StackPanel Orientation="Vertical">
+                <Border BorderThickness="1" BorderBrush="Gray">
+                    <InkCanvas
+                        Name="inkCanvas"
+                        DockPanel.Dock="Left"
+                        Width="250"
+                        Height="250">
+                    <InkCanvas.DefaultDrawingAttributes>
+                        <DrawingAttributes>
+                            <DrawingAttributes.Width>20</DrawingAttributes.Width>
+                            <DrawingAttributes.Height>20</DrawingAttributes.Height>
+                        </DrawingAttributes>
+                    </InkCanvas.DefaultDrawingAttributes>
+                    <b:Interaction.Triggers>
+                        <b:EventTrigger EventName="StrokeCollected">
+                            <b:InvokeCommandAction Command="{Binding StrokeUpdated}" CommandParameter="{Binding ElementName=inkCanvas}"/>
+                        </b:EventTrigger>
+                    </b:Interaction.Triggers>
+                </InkCanvas>
+                </Border>
+                <Button 
+                    Command="{Binding EraseCanvas}" 
+                    CommandParameter="{Binding ElementName=inkCanvas}"
+                    HorizontalAlignment="Center">Clear
+                </Button>
+            </StackPanel>
+            <TextBlock Width="230" FontSize="40" VerticalAlignment="Center" Text="{Binding ResultText}"/>
         </DockPanel>
     </Grid>
 </Window>
