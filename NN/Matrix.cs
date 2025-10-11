@@ -340,7 +340,7 @@ namespace DeepLearningDraft
 
         public override void FillFunc(Func<int, int, double> func)
         {
-            matrix.MapIndexedInplace((r, c, from) => func(r, c));
+            matrix.MapIndexedInplace((r, c, from) => func(r, c), Zeros.Include);
         }
 
         public override void HadamarProduct(Matrix a)

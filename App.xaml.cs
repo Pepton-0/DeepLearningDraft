@@ -24,6 +24,9 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // ImageLearn();
+            MathLearnAdam();
+
             // Prepare MVVM application
             Ioc.Default.ConfigureServices(new ServiceCollection()
                 .AddSingleton<IConfigService, ConfigService>()
@@ -92,6 +95,139 @@ namespace DeepLearningDraft
                 }
             }
         }
+
+        static void ImageLearnAdam()
+        {
+            var dataset = new ImageDataset("C:\\Users\\Kent2\\Desktop\\MyProgram\\WPF\\DeepLearningDraft\\archive");
+            
+            (var input, var desiredOutput) = dataset.GetSample(0, false);
+
+            Log.Line("Sample input:");
+            input.Dump();
+
+            Log.Line("Sample answer:");
+            desiredOutput.Dump();
+
+            var nn = NN.CreateFromFileOrNew("adam.xml", 8,
+                LossFunction.CrossEntropy,
+                new IntFuncPair(28 * 28, ActivationFunction.ReLu),
+                new IntFuncPair(512, ActivationFunction.ReLu),
+                new IntFuncPair(128, ActivationFunction.ReLu),
+                new IntFuncPair(10, ActivationFunction.Linear));
+
+            Log.Line("Sample calculation:");
+            nn.Calculate(input).Dump();
+
+            (Matrix input, Matrix output) GetRandomSample(bool test)
+            {
+                return dataset.GetSample(rand.Next(dataset.GetSampleCount(test)), test);
+            }
+
+            (var @in, var o) = GetRandomSample(false);
+            var prevMomentumFixedGrad = nn.LossDifferential(@in, o);
+            var prevRmsPropFixedGrad = prevMomentumFixedGrad;
+
+            int counter = 10000000;
+            for (int i = 0; i < counter; i++)
+            {
+                (var get, var output) = GetRandomSample(false);
+                (prevMomentumFixedGrad, prevRmsPropFixedGrad) =
+                    nn.Adam(
+                        prevMomentumFixedGrad, prevRmsPropFixedGrad, get, output,
+                        0.9d, 0.01, 0.01, 1e-7);
+                nn.EvaluateByLoss(new Matrix[] { get }, new Matrix[] { output });
+
+                /*
+                var inputs = new Matrix[10];
+                var answers = new Matrix[10];
+                for (int k = 0; k < 10; k++)
+                {
+                    (inputs[k], answers[k]) = dataset.GetSample(NN.rand.Next(dataset.GetSampleCount(false)), false);
+                }
+                nn.EvaluateByQuestions(inputs, answers, (pred, ans) =>
+                {
+                    return pred.MaxCell().r == ans.MaxCell().r;
+                });*/
+            }
+        }
+
+        static void MathLearnAdam()
+        {
+            var dataset = new HalfAdderDataset();
+
+            (var input, var desiredOutput) = dataset.GetSample(0, false);
+
+            Log.Line("Sample input:");
+            input.Dump();
+
+            Log.Line("Sample answer:");
+            desiredOutput.Dump();
+
+            var nn = NN.CreateFromFileOrNew("adam1.xml", 8,
+                LossFunction.SumOfSquareError,
+                new IntFuncPair(2, ActivationFunction.Sigmoid),
+                new IntFuncPair(3, ActivationFunction.Sigmoid),
+                new IntFuncPair(2, ActivationFunction.Sigmoid));
+
+            Log.Line("Sample calculation:");
+            nn.Calculate(input).Dump();
+
+            (Matrix input, Matrix output) GetRandomSample(bool test)
+            {
+                return dataset.GetSample(rand.Next(dataset.GetSampleCount(test)), test);
+            }
+
+            (var @in, var o) = GetRandomSample(false);
+            var prevMomentumFixedGrad = nn.LossDifferential(@in, o);
+            var prevRmsPropFixedGrad = prevMomentumFixedGrad;
+
+            int counter = 1000;
+            for (int i = 0; i < counter; i++)
+            {
+
+                (var get, var output) = GetRandomSample(false);
+                /*
+                (prevMomentumFixedGrad, prevRmsPropFixedGrad) =
+                    nn.Adam(
+                        prevMomentumFixedGrad, prevRmsPropFixedGrad, get, output,
+                        0.9d, 0.01, 0.01, 1e-7);*/
+
+                /*
+                var diff = nn.LossDifferential(get, output);
+                prevMomentumFixedGrad = nn.Momentum(prevMomentumFixedGrad, diff, 0.9d);
+                nn.ApplyWeightAndBiasDiff(diff, 0.01d);*/
+
+                var diff = nn.LossDifferential(get, output);
+                double rate = 0d;
+                (rate, prevRmsPropFixedGrad) = nn.RmsProp(prevRmsPropFixedGrad, diff, 0.01d, 0.01d, 1e-7);
+                nn.ApplyWeightAndBiasDiff(diff, rate);
+                Log.Line("Rate: " + rate);
+                Log.NativeLine($"{i}: ");
+                nn.EvaluateByLoss(new Matrix[] { get }, new Matrix[] { output });
+            }
+
+            nn.Dump();
+
+            Log.Line("OUTPUT matrix = NN(INPUT matrix)");
+            Log.Line("Compare OUTPUT and ANSWER");
+            Log.Line("TEST RESULT: ");
+
+            for (int idx = 0; idx < 4; idx++)
+            {
+                var data = dataset.GetSample(idx, false);
+                Log.Line($"INPUT  No.{idx}");
+                data.input.Dump();
+
+                Log.Line($"OUTPUT No.{idx}");
+                nn.Calculate(data.input).Dump();
+
+                Log.Line($"ANSWER No.{idx}");
+                data.desiredOutput.Dump();
+
+                Log.NativeLine("\n");
+            }
+        }
+
 
         static void ImageTest()
         {
