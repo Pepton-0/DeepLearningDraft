@@ -549,7 +549,14 @@ namespace DeepLearningDraft
         public Matrix[] Momentum(Matrix[] prevFixedGrad, Matrix[] currentGrad, double a)
         {
             if (prevFixedGrad == null)
-                throw new NullReferenceException("prevGrad is null");
+            {
+                prevFixedGrad = new Matrix[currentGrad.Length];
+                for (int i = 0; i < prevFixedGrad.Length; i++)
+                {
+                    prevFixedGrad[i] = new Matrix(currentGrad[i].Rows, currentGrad[i].Columns);
+                    prevFixedGrad[i].FillFunc((r, c) => 0d);
+                }
+            }
 
             for (int i = 0; i < currentGrad.Length; i++)
             {
@@ -574,7 +581,8 @@ namespace DeepLearningDraft
 
         /// <summary>
         /// v(t) = (1 - a) * v(t - 1) + a * currentGrad 〇 currentGrad
-        /// learningRate = b / (sqrt(v(t)) + epsilon)
+        /// rate = 1 / (sqrt(v(t)) + epsilon)
+        /// wb(t) = wb(t - 1) - learningRate * rate 〇 currentGrad
         /// </summary>
         /// <param name="prevFixedGrad"></param>
         /// <param name="currentGrad"></param>
@@ -582,10 +590,21 @@ namespace DeepLearningDraft
         /// <param name="b">ex. 0.01</param>
         /// <param name="epsilon">ex. 1e-7</param>
         /// <returns></returns>
-        public (double rate, Matrix[] fixedGrad)
-            RmsProp(Matrix[] prevFixedGrad, Matrix[] currentGrad, double a, double b, double epsilon)
+        public (Matrix[] rate, Matrix[] fixedGrad)
+            RmsProp(Matrix[] prevFixedGrad, Matrix[] currentGrad, double a, double epsilon)
         {
+            if(prevFixedGrad == null)
+            {
+                prevFixedGrad = new Matrix[currentGrad.Length];
+                for(int i = 0; i < prevFixedGrad.Length; i++)
+                {
+                    prevFixedGrad[i] = new Matrix(currentGrad[i].Rows, currentGrad[i].Columns);
+                    prevFixedGrad[i].FillFunc((r,c) => 0d);
+                }
+            }
+
             Matrix[] fixedGrad = new Matrix[currentGrad.Length];
+            Matrix[] rate = new Matrix[currentGrad.Length];
 
             double sum = 0d;
 
@@ -598,16 +617,14 @@ namespace DeepLearningDraft
                 prev.Execute(d => d * (1d - a));
                 matrix += prev;
 
-                matrix.RunFuncForEachCell((r, c, d) =>
-                {
-                    sum += d * d;
-                });
+                rate[i] = matrix.Clone();
+                rate[i].Execute(d => 1d / Math.Sqrt(d + epsilon));
             }
 
-            var sqrt = Math.Sqrt(sum + epsilon);
-            return (b / sqrt, fixedGrad);
+            return (rate, fixedGrad);
         }
 
+        /*
         public (Matrix[] momentumFixedGrad, Matrix[] rmsPropFixedGrad) Adam(
             Matrix[] prevMomentumFixedGrad,
             Matrix[] prevRmsPropFixedGrad,
@@ -625,7 +642,7 @@ namespace DeepLearningDraft
             }
 
             return (momentumFixedGrad, rmsPropFixedgrad);
-        }
+        }*/
 
         public void EvaluateByQuestions(Matrix[] inputs, Matrix[] answers, Func<Matrix, Matrix, bool> checker)
         {
@@ -667,7 +684,6 @@ namespace DeepLearningDraft
 
         public void SaveToFile(string filename)
         {
-
             var arr = new double[WeightsAndBiases.Sum(m => m.Rows * m.Columns)];
             int i = 0;
             for (int l = 0; l < WeightsAndBiases.Length; l++)
@@ -684,6 +700,8 @@ namespace DeepLearningDraft
                     }
                 }
             }
+            SaveSystem.Save(arr, filename);
+
             // TODO why this causes error?
             /*
             var arr = WeightsAndBiases.Select(r => r.ToByte1DimArr()).ToArray();
@@ -743,6 +761,16 @@ namespace DeepLearningDraft
             {
                 var d = diff[i].Clone();
                 d.Execute(a => a * learningRate);
+                WeightsAndBiases[i] -= d;
+            }
+        }
+
+        public void ApplyWeightAndBiasDiff(Matrix[] diff, Matrix[] learningRate)
+        {
+            for (int i = 0; i < WeightsAndBiases.Length; i++)
+            {
+                var d = diff[i].Clone();
+                d.HadamarProduct(learningRate[i]);
                 WeightsAndBiases[i] -= d;
             }
         }

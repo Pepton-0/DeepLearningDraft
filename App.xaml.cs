@@ -99,7 +99,11 @@ namespace DeepLearningDraft
         static void ImageLearnAdam()
         {
             var dataset = new ImageDataset("C:\\Users\\Kent2\\Desktop\\MyProgram\\WPF\\DeepLearningDraft\\archive");
-            
+            var order = new int[dataset.GetSampleCount(false)];
+            for(int i = 0; i < order.Length; i++)
+                order[i] = i;
+            order = order.OrderBy(i => Guid.NewGuid()).ToArray();
+
             (var input, var desiredOutput) = dataset.GetSample(0, false);
 
             Log.Line("Sample input:");
@@ -124,30 +128,53 @@ namespace DeepLearningDraft
             }
 
             (var @in, var o) = GetRandomSample(false);
-            var prevMomentumFixedGrad = nn.LossDifferential(@in, o);
+            Matrix[] prevMomentumFixedGrad = null;
             var prevRmsPropFixedGrad = prevMomentumFixedGrad;
 
-            int counter = 10000000;
-            for (int i = 0; i < counter; i++)
+            int epoch = 10000000;
+            for (int i = 0; i < epoch; i++)
             {
-                (var get, var output) = GetRandomSample(false);
-                (prevMomentumFixedGrad, prevRmsPropFixedGrad) =
-                    nn.Adam(
-                        prevMomentumFixedGrad, prevRmsPropFixedGrad, get, output,
-                        0.9d, 0.01, 0.01, 1e-7);
-                nn.EvaluateByLoss(new Matrix[] { get }, new Matrix[] { output });
+                for(int n = 0; n < order.Length; n++)
+                {
+                    (var get, var output) = dataset.GetSample(order[n], false);
+                    /*
+                    (prevMomentumFixedGrad, prevRmsPropFixedGrad) =
+                        nn.Adam(
+                            prevMomentumFixedGrad, prevRmsPropFixedGrad, get, output,
+                            0.9d, 0.01, 0.01, 1e-7);*/
 
-                /*
-                var inputs = new Matrix[10];
-                var answers = new Matrix[10];
-                for (int k = 0; k < 10; k++)
-                {
-                    (inputs[k], answers[k]) = dataset.GetSample(NN.rand.Next(dataset.GetSampleCount(false)), false);
+                    /*
+                    var diff = nn.LossDifferential(get, output);
+                    prevMomentumFixedGrad = nn.Momentum(prevMomentumFixedGrad, diff, 0.9d);
+                    nn.ApplyWeightAndBiasDiff(prevMomentumFixedGrad, 0.01d);
+                    nn.EvaluateByLoss(new Matrix[] { get }, new Matrix[] { output });*/
+
+                    var diff = nn.LossDifferential(get, output);
+                    if(n > 20)
+                    for (int j = 0; j < diff.Length; j++)
+                    {
+                        diff[j].Dump();
+                    }
+                    Matrix[] rate = null;
+                    (rate, prevRmsPropFixedGrad) = nn.RmsProp(prevRmsPropFixedGrad, diff, 0.01d, 1e-8);
+                    Log.Line(rate.ToString());
+                    nn.ApplyWeightAndBiasDiff(diff, rate);
+                    (get, output) = dataset.GetSample(rand.Next(dataset.GetSampleCount(true)), true);
+                    nn.EvaluateByLoss(new Matrix[] { get }, new Matrix[] { output });
+
+                    /*
+                    var inputs = new Matrix[10];
+                    var answers = new Matrix[10];
+                    for (int k = 0; k < 10; k++)
+                    {
+                        (inputs[k], answers[k]) = dataset.GetSample(NN.rand.Next(dataset.GetSampleCount(false)), false);
+                    }
+                    nn.EvaluateByQuestions(inputs, answers, (pred, ans) =>
+                    {
+                        return pred.MaxCell().r == ans.MaxCell().r;
+                    });*/
                 }
-                nn.EvaluateByQuestions(inputs, answers, (pred, ans) =>
-                {
-                    return pred.MaxCell().r == ans.MaxCell().r;
-                });*/
+                nn.SaveToFile("adam.xml");
             }
         }
 
@@ -198,8 +225,8 @@ namespace DeepLearningDraft
                 nn.ApplyWeightAndBiasDiff(diff, 0.01d);*/
 
                 var diff = nn.LossDifferential(get, output);
-                double rate = 0d;
-                (rate, prevRmsPropFixedGrad) = nn.RmsProp(prevRmsPropFixedGrad, diff, 0.01d, 0.01d, 1e-7);
+                Matrix[] rate = null;
+                (rate, prevRmsPropFixedGrad) = nn.RmsProp(prevRmsPropFixedGrad, diff, 0.01d, 1e-7);
                 nn.ApplyWeightAndBiasDiff(diff, rate);
                 Log.Line("Rate: " + rate);
                 Log.NativeLine($"{i}: ");
