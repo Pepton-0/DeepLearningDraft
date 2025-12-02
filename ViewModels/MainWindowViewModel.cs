@@ -49,6 +49,9 @@ namespace DeepLearningDraft.ViewModels
         private RelayCommand<object> _strokeUpdated;
         public IRelayCommand<object> StrokeUpdated => _strokeUpdated ?? new RelayCommand<object>((arg) =>
         {
+            ResultText = "Hmm...";
+            App.WpfUiUpdate();
+
             // from inkCanvas image to (28,28) image
             var inkCanvas = arg as InkCanvas;
             var dv = new DrawingVisual();
@@ -151,6 +154,8 @@ namespace DeepLearningDraft.ViewModels
         {
             this.Config = Config;
             this.Conductor = Conductor;
+
+            ResultText = "Draw a digit!";
         }
     }
 }

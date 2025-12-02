@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 
 namespace DeepLearningDraft.Models
 {
@@ -17,7 +18,7 @@ namespace DeepLearningDraft.Models
 
         public Conductor()
         {
-            nn = NN.CreateFromFileOrNew("nn.xml", 8,
+            nn = NN.CreateFromFileOrNew("nn1.xml", 8,
                 LossFunction.CrossEntropy,
                 new IntFuncPair(28 * 28, ActivationFunction.ReLu),
                 new IntFuncPair(512, ActivationFunction.ReLu),

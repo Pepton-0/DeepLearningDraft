@@ -126,6 +126,21 @@ namespace DeepLearningDraft
             }
         }
 
+        public void DumpImage(int index, bool test)
+        {
+            var img = (test ? TestPair : TrainingPair)[index].Image;
+            // Draw an image from dataset in console
+            for (int i = 0; i < 28; i++)
+            {
+                for (int j = 0; j < 28; j++)
+                {
+                    double pixelValue = img[j, i];
+                    Console.Write(pixelValue > 0.5 ? "X" : " ");
+                }
+                Console.WriteLine();
+            }
+        }
+
         /// <summary>
         /// Load MNIST label file.
         /// The byte[] is label list from 0 to 9.

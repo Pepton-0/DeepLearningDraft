@@ -82,7 +82,6 @@ namespace DeepLearningDraft
             this.WeightsAndBiases = weightsAndBiases;
             this.LayerCount = weightsAndBiases.Length;
 
-
             ActivationFuncs = funcs.Select<ActivationFunction, ActivationFunc>((f) =>
             {
                 switch (f)

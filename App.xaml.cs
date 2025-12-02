@@ -12,6 +12,7 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace DeepLearningDraft
 {
@@ -24,8 +25,8 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            // ImageLearn();
-            MathLearnAdam();
+            ImageLearn();
+            // MathLearnAdam();
 
             // Prepare MVVM application
             Ioc.Default.ConfigureServices(new ServiceCollection()
@@ -35,6 +36,18 @@ namespace DeepLearningDraft
                 .BuildServiceProvider());
 
             new MainWindow().Show();
+        }
+
+        static void ImageCheck()
+        {
+            var dataset = new ImageDataset("C:\\Users\\Kent2\\Desktop\\MyProgram\\WPF\\DeepLearningDraft\\archive");
+            for (int i = 0; i < 10; i++)
+            {
+                (var input, var desiredOutput) = dataset.GetSample(i, false);
+                Log.Line($"Sample{i}");
+                dataset.DumpImage(i, false);
+                Log.Line($"The number is : {desiredOutput.MaxCell().r}");
+            }
         }
 
         static void ImageLearn()
@@ -52,13 +65,13 @@ namespace DeepLearningDraft
                 LossFunction.CrossEntropy,
                 new IntFuncPair(28 * 28, ActivationFunction.ReLu),
                 new IntFuncPair(512, ActivationFunction.ReLu),
-                new IntFuncPair(128, ActivationFunction.ReLu),
+                new IntFuncPair(128, ActivationFunction.Linear),
                 new IntFuncPair(10, ActivationFunction.Linear));
 
             Log.Line("Sample calculation:");
             nn.Calculate(input).Dump();
 
-            int batch = 10;
+            int batch = 3;
             int trainNum = dataset.GetSampleCount(false);
             for (int epoch = 0; epoch < 10; epoch++)
             {
@@ -296,7 +309,7 @@ namespace DeepLearningDraft
                 LossFunction.SumOfSquareError,
                 new IntFuncPair(2, ActivationFunction.Sigmoid),
                 new IntFuncPair(3, ActivationFunction.Sigmoid),
-                new IntFuncPair(2, ActivationFunction.Sigmoid));
+                new IntFuncPair(2, ActivationFunction.Linear));
 
             // nn.Dump();
             for (int i = 0; i < 12000; i++)
@@ -355,10 +368,10 @@ namespace DeepLearningDraft
 
             var nn = new NN(3,
                 LossFunction.SumOfSquareError,
-                new IntFuncPair(1, ActivationFunction.ReLu),
-                new IntFuncPair(24, ActivationFunction.ReLu),
-                new IntFuncPair(24, ActivationFunction.ReLu),
-                new IntFuncPair(1, ActivationFunction.ReLu));
+                new IntFuncPair(1, ActivationFunction.Sigmoid),
+                new IntFuncPair(24, ActivationFunction.Sigmoid),
+                new IntFuncPair(24, ActivationFunction.Sigmoid),
+                new IntFuncPair(1, ActivationFunction.Linear));
 
             Log.Line("Sample output:");
             nn.Calculate(input).Dump();
@@ -406,6 +419,74 @@ namespace DeepLearningDraft
 
                 Log.Line($"(Input, Output, Answer) = ({radian:0.000}, {output[0, 0]:0.000}, {data.desiredOutput[0, 0]:0.000})");
             }
+        }
+
+        static void AbsLearn()
+        {
+            int max = 10000;
+            // f(d) = |x|
+            var dataset = new FuncDataset(max, (d) => Math.Abs(d + 0.5f));
+            (var input, var desiredOutput) = dataset.GetSample(100, false);
+
+            Log.Line("Sample input:");
+            input.Dump();
+
+            Log.Line("Sample answer:");
+            desiredOutput.Dump();
+
+            var nn = new NN(3,
+                LossFunction.SumOfSquareError,
+                new IntFuncPair(1, ActivationFunction.Sigmoid),
+                new IntFuncPair(12, ActivationFunction.Sigmoid),
+                new IntFuncPair(12, ActivationFunction.Sigmoid),
+                new IntFuncPair(1, ActivationFunction.Sigmoid));
+
+            Log.Line("Sample output:");
+            nn.Calculate(input).Dump();
+
+            for (int j = 0; j < 20; j++)
+            {
+                int batch = 100;
+
+                for (int header = 0; header < batch; header++)
+                {
+                    var amount = (max - header) / batch;
+                    var inputs = new Matrix[amount];
+                    var answers = new Matrix[amount];
+                    double learningRate = 0.01;
+
+                    for (int i = 0; i < amount; i++)
+                    {
+                        var index = header + i * batch;
+                        (inputs[i], answers[i]) = dataset.GetSample(index, false);
+                    }
+                    nn.Backpropagate(inputs, answers, learningRate);
+                    nn.EvaluateByLoss(inputs, answers);
+                }
+            }
+
+            nn.Dump();
+
+            for (var i = 0d; i < 1f; i += 0.1f)
+            {
+                int value = (int)(i * max);
+                var data = dataset.GetSample(value, false);
+                var output = nn.Calculate(data.input);
+
+                Log.Line($"(Input, Output, Answer) = ({i:0.000}, {output[0, 0]:0.000}, {data.desiredOutput[0, 0]:0.000})");
+            }
+        }
+
+        public static void WpfUiUpdate()
+        {
+            DispatcherFrame frame = new DispatcherFrame();
+            var callback = new DispatcherOperationCallback(obj =>
+            {
+                ((DispatcherFrame)obj).Continue = false;
+                return null;
+            });
+            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, callback, frame);
+            Dispatcher.PushFrame(frame);
         }
     }
 }
