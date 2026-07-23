@@ -11,7 +11,7 @@ namespace DeepLearningDraft
 
         public static void LinearDiff(Matrix x)
         {
-            x.FillFunc((r,c) => 1d);
+            x.FillFunc((r, c) => 1d);
         }
 
         public static void Sigmoid(Matrix x)
@@ -71,15 +71,25 @@ namespace DeepLearningDraft
         {
             var matrix = output.Clone();
             Softmax(matrix);
-            matrix.Execute((d) => Math.Log(d) * -1d);
+            // Clamp away from 0 so log() never hits -Infinity (which would turn into
+            // NaN once multiplied by a 0 entry of the one-hot answer below).
+            matrix.Execute((d) => Math.Log(Math.Max(d, 1e-15)) * -1d);
             matrix.HadamarProduct(answer);
             var cmatrix = Matrix.Fill1(1, matrix.Rows);
             return (cmatrix * matrix)[0, 0];
         }
 
+        /// <summary>
+        /// This assumes the output layer uses Linear activation, i.e. "output" is the
+        /// raw pre-softmax logits z, not softmax(z). The well-known simplification
+        /// dL/dz = softmax(z) - answer already bakes in the softmax activation's own
+        /// derivative, so Softmax must be applied here before subtracting the answer.
+        /// </summary>
         public static Matrix LossDiff_CrossEntropy(Matrix output, Matrix answer)
         {
-            return output - answer;
+            var softmaxOutput = output.Clone();
+            Softmax(softmaxOutput);
+            return softmaxOutput - answer;
         }
 
         /// <summary>
@@ -89,7 +99,10 @@ namespace DeepLearningDraft
         /// <returns></returns>
         public static void Softmax(Matrix x)
         {
-            x.Execute((d) => Math.Exp(d));
+            // Subtract the max logit first (does not change the result, since it cancels
+            // out in the ratio) so exp() doesn't overflow to Infinity for large logits.
+            double max = x.MaxCell().d;
+            x.Execute((d) => Math.Exp(d - max));
             var cmatrix = Matrix.Fill1(x.Columns, x.Rows);
             double sigma = (cmatrix * x)[0, 0];
             x.Execute((d) => d / sigma);

@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.DependencyInjection;
+﻿
+using CommunityToolkit.Mvvm.DependencyInjection;
 using DeepLearningDraft.Models;
 using DeepLearningDraft.Models.Services;
 using DeepLearningDraft.ViewModels;
@@ -25,8 +26,9 @@ namespace DeepLearningDraft
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            ImageLearn();
+            //ImageLearn();
             // MathLearnAdam();
+            ImageTest();
 
             // Prepare MVVM application
             Ioc.Default.ConfigureServices(new ServiceCollection()
@@ -272,11 +274,12 @@ namespace DeepLearningDraft
         static void ImageTest()
         {
             var dataset = new ImageDataset("C:\\Users\\Kent2\\Desktop\\MyProgram\\WPF\\DeepLearningDraft\\archive");
-            var nn = NN.CreateFromFileOrNew("nn.xml", 8,
+
+            var nn = NN.CreateFromFileOrNew("nn1.xml", 8,
                 LossFunction.CrossEntropy,
                 new IntFuncPair(28 * 28, ActivationFunction.ReLu),
                 new IntFuncPair(512, ActivationFunction.ReLu),
-                new IntFuncPair(128, ActivationFunction.ReLu),
+                new IntFuncPair(128, ActivationFunction.Linear),
                 new IntFuncPair(10, ActivationFunction.Linear));
 
             int batch = dataset.GetSampleCount(true);
